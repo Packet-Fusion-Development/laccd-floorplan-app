@@ -7,6 +7,9 @@ District Technology Survey.
 Runs as a single Cloudflare Worker: static frontend at the edge, PDFs streamed
 from R2.
 
+**Live:** https://laccd-floorplan-app.itcontact-521.workers.dev
+**Cloudflare account:** `itcontact@packetfusion.com` (`521c322a89a17bb69f91f1e65177606e`)
+
 ## Stack
 
 | Layer | Choice | Why |
@@ -51,11 +54,9 @@ npm install
 npx wrangler login
 ```
 
-Create the bucket and seed it (one time, ~380 MB):
+The `laccd-floorplans` bucket already exists. Seed it (one time, ~380 MB):
 
 ```bash
-npx wrangler r2 bucket create laccd-floorplans
-
 cp .env.example .env      # then fill in R2 API token credentials
 npm run upload:pdfs -- --dry-run    # confirm what it would push
 npm run upload:pdfs
@@ -65,14 +66,23 @@ npm run upload:pdfs
 same size, so an interrupted upload can just be restarted. Use `--force` to
 overwrite.
 
+> **Do not bulk-upload with `wrangler r2 object put`.** It truncates keys at
+> the first `#`, so `LASC/Parking Structure #8.pdf` silently lands under the
+> key `LASC/Parking Structure ` and the Worker can never find it. `wrangler r2
+> object get` truncates identically, so a CLI round-trip appears to succeed and
+> hides the problem — only `list()` reveals the real key. Two files in this set
+> are affected. `upload:pdfs` uses the S3 API and stores keys verbatim.
+
 ## Develop
 
 ```bash
-npm run dev        # http://localhost:8787
+npm run dev          # http://localhost:8787 — local R2 stub
+npm run dev:remote   # http://localhost:8787 — reads the real R2 bucket
 ```
 
-`wrangler dev` is configured to read the **real** R2 bucket, so PDF links work
-locally exactly as they do in production.
+`npm run dev` runs fully locally, which is what you want for frontend work: it
+needs no network and starts instantly. Its R2 stub is empty, though, so
+`/pdfs/*` returns 404. Use `dev:remote` to exercise real PDF delivery.
 
 ## Deploy
 
@@ -104,13 +114,13 @@ To add drawings: drop the PDF in `pdfs/<CAMPUS>/`, the thumbnail in
 
 ## Access control
 
-**These drawings are not currently gated.** They include telecom pathway and
-VoIP cabling as-builts for public college campuses — worth a deliberate
-decision before the Worker gets a public hostname.
+The catalog is served **publicly, with no authentication** — a deliberate call
+made during the migration. Note that the drawings include telecom pathway and
+VoIP cabling as-builts for the campuses.
 
-To require district SSO, put Cloudflare Access in front of the whole app —
-no application code changes, and because PDFs are proxied through the Worker
-rather than served from a public bucket, they are covered by the same policy:
+If that decision is revisited, Cloudflare Access gates the whole app with no
+application code changes. Because PDFs are proxied through the Worker rather
+than served from a public bucket, one policy covers the drawings too:
 
 1. Zero Trust → Access → Applications → Add a self-hosted application
 2. Domain: the Worker's route

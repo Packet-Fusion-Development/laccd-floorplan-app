@@ -61,10 +61,16 @@ async function servePdf(
   // Browsers issue range requests to stream large PDFs progressively. A 206
   // must never be stored under — or served from — the whole-object cache key.
   const isRangeRequest = request.headers.has("range");
+  // The cache key below is a bare GET, so it carries no validators. Serving a
+  // revalidation from it would return a full 200 body and never a 304, so
+  // conditional requests bypass the cache and let R2's `onlyIf` answer them.
+  const isConditional =
+    request.headers.has("if-none-match") || request.headers.has("if-modified-since");
+
   const cache = caches.default;
   const cacheKey = new Request(url.toString(), { method: "GET" });
 
-  if (isGet && !isRangeRequest) {
+  if (isGet && !isRangeRequest && !isConditional) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
   }

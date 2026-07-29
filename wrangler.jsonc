@@ -4,6 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
 
+  // itcontact@packetfusion.com's account. Pinned explicitly because the OAuth
+  // tokens in use can see several accounts, and wrangler refuses to guess.
+  "account_id": "521c322a89a17bb69f91f1e65177606e",
+
   "observability": {
     "enabled": true
   },

@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node scripts/build-catalog.mjs",
     "dev": "npm run build && wrangler dev",
+    "dev:remote": "npm run build && wrangler dev --remote",
     "deploy": "npm run build && wrangler deploy",
     "upload:pdfs": "node --env-file-if-exists=.env scripts/upload-pdfs.mjs",
     "typecheck": "tsc --noEmit",
