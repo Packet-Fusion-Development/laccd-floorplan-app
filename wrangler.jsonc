@@ -12,6 +12,27 @@
     "enabled": true
   },
 
+  // Cloudflare Access can only protect a hostname on a zone in this account —
+  // it cannot protect *.workers.dev. So the app moves to a custom domain and
+  // workers.dev is switched off, rather than left open beside the gated door.
+  //
+  // Deploying this creates the DNS record. Create the Access application
+  // FIRST (see README) so the hostname is never briefly public.
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "laccd-floorplan-app.packetfusion.com",
+      "custom_domain": true
+    }
+  ],
+
+  "vars": {
+    // Both must be set for the Worker to enforce Access. Empty = open.
+    // ACCESS_AUD is the application's AUD tag, not a secret.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

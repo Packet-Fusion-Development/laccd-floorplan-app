@@ -10,11 +10,17 @@
  * means the bucket itself never has to be world-readable.
  */
 
+import { verifyAccess } from "./access";
+
 export interface Env {
   /** Static assets: frontend shell, catalog.json, and floor-plan thumbnails. */
   ASSETS: Fetcher;
   /** Source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf" (e.g. "ELAC/ELAC A5 Floor Plan.pdf"). */
   PDFS: R2Bucket;
+  /** Access team domain, e.g. "packetfusion.cloudflareaccess.com". Empty = no enforcement. */
+  ACCESS_TEAM_DOMAIN: string;
+  /** Access application AUD tag. Empty = no enforcement. */
+  ACCESS_AUD: string;
 }
 
 /** Requests under this prefix are served from R2 rather than from static assets. */
@@ -25,14 +31,30 @@ const PDF_PREFIX = "/pdfs/";
  * is safe. The shorter browser TTL keeps a stale copy from pinning a user to
  * a superseded revision for a full day.
  */
-const PDF_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400";
+const PDF_CACHE_CONTROL_PUBLIC = "public, max-age=3600, s-maxage=86400";
+
+/**
+ * Once Access is enforcing, the drawings are authenticated content. "private"
+ * keeps intermediary caches — corporate proxies in particular — from holding a
+ * copy they would hand to someone who never passed the Access check. It also
+ * disables our own edge cache, since the Cache API honours it; that costs an
+ * R2 read per request, which is the right trade for not leaking drawings.
+ */
+const PDF_CACHE_CONTROL_PRIVATE = "private, max-age=3600";
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith(PDF_PREFIX)) {
-      return servePdf(request, env, ctx, url);
+      // Access gates the hostname at the edge; this re-checks the assertion so
+      // the drawings stay protected even if something reaches the Worker
+      // directly. Static assets are not re-checked here — see README.
+      const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
+      if (!access.ok) return access.response;
+
+      const gated = Boolean(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
+      return servePdf(request, env, ctx, url, gated);
     }
 
     return env.ASSETS.fetch(request);
@@ -44,6 +66,7 @@ async function servePdf(
   env: Env,
   ctx: ExecutionContext,
   url: URL,
+  gated: boolean,
 ): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", {
@@ -70,7 +93,7 @@ async function servePdf(
   const cache = caches.default;
   const cacheKey = new Request(url.toString(), { method: "GET" });
 
-  if (isGet && !isRangeRequest && !isConditional) {
+  if (isGet && !isRangeRequest && !isConditional && !gated) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
   }
@@ -88,7 +111,7 @@ async function servePdf(
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
   headers.set("accept-ranges", "bytes");
-  headers.set("cache-control", PDF_CACHE_CONTROL);
+  headers.set("cache-control", gated ? PDF_CACHE_CONTROL_PRIVATE : PDF_CACHE_CONTROL_PUBLIC);
   if (!headers.has("content-type")) {
     headers.set("content-type", "application/pdf");
   }
@@ -120,7 +143,9 @@ async function servePdf(
   }
 
   const response = new Response(object.body, { status: 200, headers });
-  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  if (!gated) {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  }
   return response;
 }
 
