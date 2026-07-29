@@ -1,0 +1,24 @@
+{
+  "name": "laccd-floorplan-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LACCD Floorplan Catalog — Cloudflare Worker serving a searchable index of district floor plans",
+  "scripts": {
+    "build": "node scripts/build-catalog.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "upload:pdfs": "node --env-file-if-exists=.env scripts/upload-pdfs.mjs",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1097.0",
+    "@cloudflare/workers-types": "^5.20260729.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.115.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

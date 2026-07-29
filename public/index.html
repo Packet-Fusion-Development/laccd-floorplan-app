@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LACCD Floorplan Catalog</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-top">
+    <div class="brand-mark">
+      <img src="https://packetfusion.com/wp-content/uploads/2024/09/PacketFusion-Bridgepoint-Logo.png" alt="PacketFusion - Powered by Bridgepointe Technologies" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="brand-fallback" style="display:none;">Packet<span>Fusion</span></div>
+    </div>
+    <div class="powered-by">LACCD District Technology Survey</div>
+  </div>
+
+  <h1>LACCD Floorplan Catalog</h1>
+  <p class="subtitle" id="subtitle">Loading...</p>
+</header>
+
+<main class="app-main">
+
+  <section class="search-panel">
+    <input id="searchInput" type="text" placeholder="Search building, floor, or filename..." autocomplete="off">
+    <div class="filters">
+      <select id="filterCampus"><option value="">All campuses</option></select>
+      <select id="filterBuilding"><option value="">All buildings</option></select>
+      <button id="clearFilters" type="button">Clear filters</button>
+    </div>
+  </section>
+
+  <section class="results-meta">
+    <span id="resultCount"></span>
+  </section>
+
+  <section id="resultsGrid" class="results-grid"></section>
+
+  <nav id="pagination" class="pagination"></nav>
+
+</main>
+
+<div id="detailOverlay" class="detail-overlay hidden">
+  <div class="detail-panel">
+    <button id="closeDetail" class="close-btn" type="button" aria-label="Close">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

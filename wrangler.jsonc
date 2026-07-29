@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "laccd-floorplan-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+
+  "observability": {
+    "enabled": true
+  },
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Only PDF requests need the Worker. The shell, catalog.json, and all 719
+    // thumbnails are served straight from the edge with no Worker invocation.
+    "run_worker_first": ["/pdfs/*"]
+  },
+
+  "r2_buckets": [
+    {
+      "binding": "PDFS",
+      "bucket_name": "laccd-floorplans",
+      // `wrangler dev` reads from the real bucket instead of a local stub, so
+      // local testing exercises the same objects production serves.
+      "preview_bucket_name": "laccd-floorplans"
+    }
+  ]
+}

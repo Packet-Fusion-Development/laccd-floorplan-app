@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Generated at build time from data/catalog.json — see scripts/build-catalog.mjs
+public/catalog.json
+
+# R2 upload credentials
+.env
+
+# Wrangler / Workers
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+worker-configuration.d.ts
+
+# Source PDFs — NOT tracked in git.
+# ~380 MB across 719 files. These live in R2 (bucket: laccd-floorplans).
+# Keep the local ./pdfs/ directory to seed or re-sync the bucket:
+#   npm run upload:pdfs
+pdfs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local Claude Code overrides
+.claude/settings.local.json
