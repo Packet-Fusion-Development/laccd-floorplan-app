@@ -10,6 +10,7 @@
     "dev:remote": "npm run build && wrangler dev --remote",
     "deploy": "npm run build && wrangler deploy",
     "upload:pdfs": "node --env-file-if-exists=.env scripts/upload-pdfs.mjs",
+    "verify:r2": "node --env-file-if-exists=.env scripts/verify-r2.mjs",
     "test": "node scripts/test-access.mjs",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types"

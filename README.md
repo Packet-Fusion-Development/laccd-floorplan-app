@@ -46,6 +46,7 @@ scripts/
   build-catalog.mjs       Validates + minifies data/catalog.json → public/catalog.json
   upload-pdfs.mjs         Seeds / re-syncs R2 from ./pdfs
   test-access.mjs         Tests for the Access JWT gate (npm test)
+  verify-r2.mjs           Cross-checks the R2 bucket against the catalog
 pdfs/<CAMPUS>/*.pdf       Source drawings — NOT in git, lives in R2
 ```
 
@@ -67,6 +68,16 @@ npm run upload:pdfs
 `upload:pdfs` is idempotent — re-running skips objects already present at the
 same size, so an interrupted upload can just be restarted. Use `--force` to
 overwrite.
+
+Then confirm the bucket matches the catalog:
+
+```bash
+npm run verify:r2
+```
+
+This checks every catalog row against a real R2 key and size, and reports
+orphans. Run it after any bulk upload — a key mangled on the way in produces
+a card that 404s on click, and nothing else surfaces that.
 
 > **Do not bulk-upload with `wrangler r2 object put`.** It truncates keys at
 > the first `#`, so `LASC/Parking Structure #8.pdf` silently lands under the
