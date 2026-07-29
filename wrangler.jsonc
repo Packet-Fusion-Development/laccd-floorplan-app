@@ -29,8 +29,8 @@
   "vars": {
     // Both must be set for the Worker to enforce Access. Empty = open.
     // ACCESS_AUD is the application's AUD tag, not a secret.
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_TEAM_DOMAIN": "packetfusion.cloudflareaccess.com",
+    "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad"
   },
 
   "assets": {
@@ -45,8 +45,8 @@
     {
       "binding": "PDFS",
       "bucket_name": "laccd-floorplans",
-      // `wrangler dev` reads from the real bucket instead of a local stub, so
-      // local testing exercises the same objects production serves.
+      // Used by `wrangler dev --remote` (npm run dev:remote). Plain
+      // `wrangler dev` uses a local stub and will 404 on /pdfs/*.
       "preview_bucket_name": "laccd-floorplans"
     }
   ]
