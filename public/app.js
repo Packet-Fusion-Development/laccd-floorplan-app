@@ -14,7 +14,73 @@ function assetUrl(relPath) {
   return '/' + String(relPath).split('/').map(encodeURIComponent).join('/');
 }
 
+/**
+ * Populates the header chip from the Cloudflare Access session.
+ *
+ * /cdn-cgi/access/get-identity is served by Cloudflare on the app's own
+ * hostname, so this needs no Worker route. It returns 400 when there is no
+ * Access session — running locally, for instance — in which case the chip
+ * stays hidden rather than showing a half-empty control.
+ */
+async function initUserChip() {
+  let identity;
+  try {
+    const res = await fetch('/cdn-cgi/access/get-identity', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    identity = await res.json();
+  } catch {
+    return;
+  }
+
+  const email = identity.email || '';
+  const name = identity.name || email;
+  if (!name) return;
+
+  const menu = document.getElementById('userMenu');
+  const chip = document.getElementById('userChip');
+  const dropdown = document.getElementById('userDropdown');
+
+  document.getElementById('userAvatar').textContent = initials(name, email);
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userMenuName').textContent = name;
+  document.getElementById('userMenuEmail').textContent = email;
+  chip.setAttribute('aria-label', `Signed in as ${name}`);
+  menu.hidden = false;
+
+  const setOpen = (open) => {
+    dropdown.hidden = !open;
+    chip.setAttribute('aria-expanded', String(open));
+  };
+
+  chip.addEventListener('click', e => {
+    e.stopPropagation();
+    setOpen(dropdown.hidden);
+  });
+
+  document.addEventListener('click', e => {
+    if (!menu.contains(e.target)) setOpen(false);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || dropdown.hidden) return;
+    // Claim Escape so it does not also fall through to the detail overlay.
+    e.stopPropagation();
+    setOpen(false);
+    chip.focus();
+  }, true);
+}
+
+/** Two letters: initials of a display name, else the start of the email. */
+function initials(name, email) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  const source = words[0] || email || '?';
+  return source.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || '?';
+}
+
 async function init() {
+  initUserChip();
+
   try {
     const res = await fetch('/catalog.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

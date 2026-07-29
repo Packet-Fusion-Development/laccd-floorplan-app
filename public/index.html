@@ -14,7 +14,26 @@
       <img src="https://packetfusion.com/wp-content/uploads/2024/09/PacketFusion-Bridgepoint-Logo.png" alt="PacketFusion - Powered by Bridgepointe Technologies" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
       <div class="brand-fallback" style="display:none;">Packet<span>Fusion</span></div>
     </div>
-    <div class="powered-by">LACCD District Technology Survey</div>
+    <div class="app-header-right">
+      <div class="powered-by">LACCD District Technology Survey</div>
+
+      <!-- Populated from /cdn-cgi/access/get-identity; stays hidden when the
+           app is not running behind Access (e.g. local dev). -->
+      <div class="user-menu" id="userMenu" hidden>
+        <button class="user-chip" id="userChip" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
+          <span class="user-name" id="userName"></span>
+          <span class="user-caret" aria-hidden="true"></span>
+        </button>
+        <div class="user-dropdown" id="userDropdown" role="menu" hidden>
+          <div class="user-identity">
+            <div class="user-identity-name" id="userMenuName"></div>
+            <div class="user-identity-email" id="userMenuEmail"></div>
+          </div>
+          <a class="user-signout" id="userSignOut" role="menuitem" href="/cdn-cgi/access/logout">Sign out</a>
+        </div>
+      </div>
+    </div>
   </div>
 
   <h1>LACCD Floorplan Catalog</h1>

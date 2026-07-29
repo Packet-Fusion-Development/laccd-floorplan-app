@@ -461,3 +461,123 @@ h1, h2, h3, h4 { font-family: var(--font-head); }
   color: var(--muted);
   font-style: italic;
 }
+
+/* ---- Access identity chip ------------------------------------------------ */
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.user-menu { position: relative; }
+.user-menu[hidden] { display: none; }
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px 5px 5px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.user-chip:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.34);
+}
+
+.user-chip:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--green);
+  color: var(--navy-dark);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+}
+
+/* The stylesheet has no breakpoints, so the chip absorbs long names itself
+   rather than relying on a lone media query. */
+.user-name {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(255,255,255,0.75);
+  transition: transform .15s ease;
+}
+
+.user-chip[aria-expanded="true"] .user-caret { transform: rotate(180deg); }
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 236px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0,42,66,0.22);
+  overflow: hidden;
+  z-index: 60;
+}
+
+.user-dropdown[hidden] { display: none; }
+
+.user-identity {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-identity-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.user-identity-email {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.user-signout {
+  display: block;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  text-decoration: none;
+}
+
+.user-signout:hover { background: var(--navy-tint); }
+
+.user-signout:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
