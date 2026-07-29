@@ -145,10 +145,25 @@ https://<team-name>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
 
 Every Access application in the org shares that one IdP integration, so
-adding this app does **not** require a new redirect URI. The exception: if the
-existing Entra app registration was set up against a Zero Trust org in a
-*different* Cloudflare account, add that account's team-domain callback as an
-additional redirect URI (Entra allows several).
+adding a *second* application here does not require a new redirect URI.
+
+What did have to be registered once was this org's callback. PacketFusion's
+existing Entra app registration (`7660c7e3-5a2f-4abb-be55-caa1ab0d367a`) had
+been set up against a different Zero Trust org, so the first sign-in failed
+with:
+
+```
+AADSTS50011: The redirect URI 'https://packetfusion.cloudflareaccess.com/cdn-cgi/access/callback'
+specified in the request does not match the redirect URIs configured for the application
+```
+
+That is an OAuth handshake failure, not an Access policy failure — it happens
+before Cloudflare has an identity to evaluate a policy against, so no amount
+of policy editing will move it. Fix: Entra admin center → that app
+registration → Authentication → Platform configurations → Web → Add URI →
+`https://packetfusion.cloudflareaccess.com/cdn-cgi/access/callback`. Entra
+allows several redirect URIs, so this does not disturb the org it already
+serves.
 
 ### Setup
 
