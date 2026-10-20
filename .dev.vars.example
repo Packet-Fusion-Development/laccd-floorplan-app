@@ -1,0 +1,8 @@
+# Local overrides for `wrangler dev`. Copy to .dev.vars (gitignored).
+#
+# There is no Cloudflare Access in front of localhost, so the JWT check would
+# reject every /api and /pdfs request. Blank values turn enforcement off for
+# local dev only; wrangler.jsonc keeps it on for every deploy.
+# The quotes matter: a bare `KEY=` is ignored and the wrangler.jsonc value wins.
+ACCESS_TEAM_DOMAIN=""
+ACCESS_AUD=""

@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "laccd-floorplan-app",
+  // Renamed from laccd-floorplan-app. A new name deploys as a NEW Worker, so
+  // follow the cutover checklist in the README before this reaches main.
+  "name": "pf-site-survey",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
 
@@ -30,15 +32,19 @@
     // Both must be set for the Worker to enforce Access. Empty = open.
     // ACCESS_AUD is the application's AUD tag, not a secret.
     "ACCESS_TEAM_DOMAIN": "packetfusion.cloudflareaccess.com",
-    "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad"
+    "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad",
+    // Who may change project setup: branding, site briefings, inventory
+    // imports. Comma-separated. Everyone signed in can survey.
+    "ADMIN_EMAILS": "ksabonis@packetfusion.com"
   },
 
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    // Only PDF requests need the Worker. The shell, catalog.json, and all 719
-    // thumbnails are served straight from the edge with no Worker invocation.
-    "run_worker_first": ["/pdfs/*"]
+    // Only PDF and API requests need the Worker. The shell, catalog.json, and
+    // all 719 thumbnails are served straight from the edge with no Worker
+    // invocation.
+    "run_worker_first": ["/pdfs/*", "/api/*"]
   },
 
   "r2_buckets": [
@@ -48,6 +54,72 @@
       // Used by `wrangler dev --remote` (npm run dev:remote). Plain
       // `wrangler dev` uses a local stub and will 404 on /pdfs/*.
       "preview_bucket_name": "laccd-floorplans"
+    },
+    {
+      // Field survey photos for every project. Create once with
+      // `npx wrangler r2 bucket create pf-site-survey-media`.
+      "binding": "MEDIA",
+      "bucket_name": "pf-site-survey-media"
     }
-  ]
+  ],
+
+  // Multi-project survey data: customers, projects, sites, floor plans,
+  // rooms, surveys, devices, photos. Schema in ./migrations.
+  // database_id is a placeholder until `npx wrangler d1 create pf-site-survey`
+  // is run against the account. Local dev (`--local`) works without it.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pf-site-survey",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "env": {
+    // Test copy for trying the field app on real phones and tablets:
+    //   npx wrangler deploy --env test
+    // Its own Worker, database and photo bucket, so nothing here touches the
+    // live floor-plan app. It reads the same drawings bucket (read-only use).
+    //
+    // survey-test.packetfusion.com must be covered by a Cloudflare Access
+    // application BEFORE the first deploy — the static shell and catalog are
+    // served without the Worker, so Access at the edge is their only gate.
+    "test": {
+      "name": "pf-site-survey-test",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "survey-test.packetfusion.com",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ACCESS_TEAM_DOMAIN": "packetfusion.cloudflareaccess.com",
+        // The AUD of the Access application that covers survey-test. If the
+        // hostname is added to the existing floor-plan Access app, it is this
+        // same tag; a separate Access app has its own — paste it here.
+        "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad",
+        "ADMIN_EMAILS": "ksabonis@packetfusion.com"
+      },
+      "r2_buckets": [
+        {
+          "binding": "PDFS",
+          "bucket_name": "laccd-floorplans"
+        },
+        {
+          "binding": "MEDIA",
+          "bucket_name": "pf-site-survey-media-test"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pf-site-survey-test",
+          "database_id": "cf2b90d5-1c85-4117-b680-abc1e1b9d467",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "Packet Fusion Site Survey",
+  "short_name": "Site Survey",
+  "description": "Packet Fusion field survey: rooms, device locations, photos and floor plans.",
+  "start_url": "/survey",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7f8",
+  "theme_color": "#003B5C",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

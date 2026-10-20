@@ -1,8 +1,163 @@
-# LACCD Floorplan Catalog
+# PF Site Survey
 
-Searchable catalog of 719 floor plans and telecom as-built drawings across the
-ten Los Angeles Community College District campuses, built for the LACCD
-District Technology Survey.
+Packet Fusion's field survey platform. Engineers record rooms, device mounting
+locations, device photos and floor-plan pins on site, from a phone or tablet,
+into one central database that serves every customer project.
+
+**LACCD is the first project.** The app started as the LACCD Floorplan Catalog:
+a searchable catalog of 719 floor plans and telecom as-built drawings across
+the ten Los Angeles Community College District campuses, built for the LACCD
+District Technology Survey. That catalog is still what the app serves today,
+and it seeds the LACCD project in the survey database. Some names (the
+`laccd-floorplans` bucket, the 1Password item, the current hostname) still say
+LACCD because they hold LACCD's data or have not been cut over yet. See
+[Rename cutover](#rename-cutover).
+
+## Survey data model
+
+D1 database `pf-site-survey` (binding `DB`), schema in
+[migrations/0001_multi_project_schema.sql](migrations/0001_multi_project_schema.sql):
+
+```
+customer → project → site → building → floor → floor_plan (drawing sheet)
+                                            → room
+project  → survey → device (pinned on a floor_plan) → photo
+```
+
+- **Ids are UUIDs** so field devices can create surveys, devices and photos
+  offline and sync later without collisions.
+- **Field-synced rows** (rooms, surveys, devices, photos) carry `updated_at`
+  and `deleted_at`, so offline edits and deletions can be reconciled.
+- **Device pins** are stored as `pin_x` / `pin_y` fractions (0–1) of the sheet,
+  so they stay in place at any zoom or render size.
+- **Category-specific device fields** go in the `attributes` JSON column, so a
+  new device type needs no migration.
+- **Room names in the LACCD export do not pair with room numbers**, so the seed
+  creates one room per distinct room number and keeps the names as search text
+  (`floor_plans.room_names_raw`). Engineers confirm room names in the field.
+
+```bash
+npm run db:migrate:local    # apply migrations to local D1
+npm run db:seed:local       # load LACCD from data/catalog.json (idempotent)
+```
+
+The seed derives every id from its natural key, so it can be re-run after a
+catalog edit without duplicating rows. `:remote` variants exist for both
+commands. They write to the deployed database.
+
+## Field survey app
+
+`/survey` is an installable web app (PWA) for phones, tablets and desktops.
+It is always branded **Packet Fusion Site Survey**, with the Packet Fusion
+logo on every screen and no provider name or partner logo. It is generic: it
+works for a university campus, a city's facilities, or a company's offices.
+Each project sets only:
+
+- **Wording:** what a location is called (Campus / Facility / Office) and
+  what is being surveyed.
+- **Categories:** each has a briefing button (e.g. "User List") and an item
+  name for list and form screens (e.g. "Phones").
+- **Get Support** contacts (call, text, email).
+
+The engineer flow follows the welcome screen:
+
+1. **Start** → choose a site.
+2. **Site briefing:** site contact, parking, access hours, maps, and
+   **Get Support**.
+3. Choose a category.
+4. Search the pre-loaded list by name, extension or number.
+5. Mark the location on the floor plan (or describe it if no plan exists).
+6. Fill in the required fields: the **test result** (working / not working /
+   can't test), plus a location.
+7. Add a photo only if something is unusual.
+8. Set the **discrepancy flag** if something doesn't match the list.
+
+Saved items drop off the list. Each engineer gets one survey per site,
+created automatically.
+
+**How each screen looks.** The layout follows the field-survey mockups:
+
+- Solid brand-blue buttons on the site picker and the briefing.
+- **Briefing:** a red "Contact … Support" button, plus WiFi network,
+  username and password (masked until tapped).
+- **List screen:** a blue app bar with back, refresh, sort and +, then
+  Search items and a Not started / All filter.
+- **Record form:** form-first, with ✕ and ✓ in the app bar; Site, Building
+  and Floor at the top; a "Mark on floor plan" step; and an Attachments box.
+
+Each category can add its own fields, such as "Cable drop status: Present,
+Not present". Values are stored in `devices.attributes` and included in the
+CSV export.
+
+On phones, screens fill the display. On tablets and iPad they become a
+centred card.
+
+**Project setup** (`#/p/<code>/setup`, for the emails in `ADMIN_EMAILS`):
+
+- Branding and wording.
+- Logo upload.
+- Site briefings.
+- **Device-list import from CSV or Excel.** Columns are mapped automatically
+  and can be adjusted. Buildings and floors that don't exist yet are created.
+  Re-importing the same list updates rows instead of duplicating them.
+- Results download (`/api/projects/<code>/devices.csv`), including test
+  results and discrepancies.
+
+Schema: [migrations/0002_field_workflow.sql](migrations/0002_field_workflow.sql).
+Excel parsing uses SheetJS 0.20.3, vendored in `public/vendor/xlsx-0.20.3`.
+It is loaded only on the setup screen.
+
+**Online-first, offline as a fallback.** With a connection, every screen
+loads live from the server and every save goes straight to D1. A copy of
+what was loaded is kept on the device. Only when a request fails (no signal,
+or no answer within 8 s) does the app switch to that copy and queue new
+changes on the device. The queue syncs by itself, in order, when the
+connection returns. Details:
+
+| Piece | Where | Behaviour |
+|---|---|---|
+| Screens and data | [public/js/net.js](public/js/net.js) | Network first. Offline: device copy (IndexedDB) plus queued changes, marked "Not synced". |
+| Writes | [src/api.ts](src/api.ts) | Idempotent `PUT`s keyed by a device-generated UUID, so a replayed queue lands once. Conflicts: last write wins on the client's `updated_at`, clamped so a fast clock cannot win forever. |
+| Room added offline twice | `PUT /api/rooms/:id` | The server merges into the existing room (`merged_into`) and the app repoints queued devices. |
+| App shell, plans, photos | [public/sw.js](public/sw.js) | Service worker, network first, cached copy only on failure. Floor-plan PDFs and photos are kept once viewed. |
+| Expired sign-in | `net.js` | Treated like offline (nothing is lost), with a "Sign in again" prompt. |
+| Server rejected a change | `net.js` | Moved to a review list instead of blocking the queue. |
+
+Floor plans render from the PDF with pdf.js (vendored in
+`public/vendor/pdfjs-3.11.174`, so it works offline). They fall back to the
+catalog thumbnail if the PDF cannot load. Local dev has no PDFs in R2, so
+locally you will always see the thumbnail.
+
+**Local dev:** `cp .dev.vars.example .dev.vars` first. It turns off the Access
+check for localhost only. Then `npm run db:migrate:local`,
+`npm run db:seed:local`, `npm run dev`, and open http://localhost:8787/survey.
+
+When changing a file listed in `SHELL` in `public/sw.js`, bump `VERSION` so
+installed apps refresh their offline copy.
+
+## Rename cutover
+
+The repo, Worker and app are being renamed from `laccd-floorplan-app` to
+`pf-site-survey`. A Worker's name is its identity, so the new name deploys as a
+**new Worker** next to the old one. Do these steps in order before this branch
+merges to `main` (merging auto-deploys):
+
+1. **GitHub** (repo admin): Settings → General → rename to `pf-site-survey`.
+   GitHub redirects the old URL. Then reconnect Workers Builds if it is linked.
+2. **D1**: `npx wrangler d1 create pf-site-survey`, paste the id into
+   `wrangler.jsonc` in place of the placeholder, then `npm run db:migrate:remote`
+   and `npm run db:seed:remote`. Create the photo bucket:
+   `npx wrangler r2 bucket create pf-site-survey-media`.
+3. **Access**: create a self-hosted Access application for the new hostname
+   (e.g. `survey.packetfusion.com`) **before** deploying to it, then set its
+   `ACCESS_AUD` in `wrangler.jsonc` and update the `routes` pattern.
+4. **Deploy** `pf-site-survey`, confirm it serves, then remove the old
+   `laccd-floorplan-app` Worker, or keep its hostname as a redirect.
+
+Until step 3, `wrangler.jsonc` still routes `laccd-floorplan-app.packetfusion.com`.
+That domain is attached to the old Worker. **Do not deploy the new Worker
+until step 3 is done**: depending on the Wrangler version, the deploy will
+either fail or move the hostname away from the old Worker.
 
 Runs as a single Cloudflare Worker: static frontend at the edge, PDFs streamed
 from R2.

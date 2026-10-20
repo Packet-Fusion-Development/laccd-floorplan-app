@@ -1,9 +1,9 @@
 {
-  "name": "laccd-floorplan-app",
+  "name": "pf-site-survey",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "LACCD Floorplan Catalog — Cloudflare Worker serving a searchable index of district floor plans",
+  "description": "PF Site Survey — Packet Fusion's multi-project field survey platform on Cloudflare Workers",
   "scripts": {
     "build": "node scripts/build-catalog.mjs",
     "dev": "npm run build && wrangler dev",
@@ -12,6 +12,11 @@
     "upload:pdfs": "node --env-file-if-exists=.env scripts/upload-pdfs.mjs",
     "verify:r2": "node --env-file-if-exists=.env scripts/verify-r2.mjs",
     "test": "node scripts/test-access.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:seed:build": "node scripts/build-seed.mjs",
+    "db:seed:local": "npm run db:seed:build && wrangler d1 execute DB --local --file data/seed/laccd.sql",
+    "db:seed:remote": "npm run db:seed:build && wrangler d1 execute DB --remote --file data/seed/laccd.sql",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types"
   },

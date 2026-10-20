@@ -1,0 +1,575 @@
+/* Field survey app — styled after the field-survey mockups: Packet Fusion
+   grey page, white screens, solid brand-blue buttons and app bars.
+
+   Phones (< 640px): each screen fills the display like a native app.
+   Tablets / iPad / desktop: screens become a centred card with larger
+   touch targets; floor-plan screens use the full width.
+
+   Colour roles: Packet Fusion navy (--navy) for text and structure; the
+   project's brand colour (--brand, per project) for bars and actions. */
+
+.survey-app {
+  --brand: #3860B2;
+  --brand-ink: #fff;
+  --alert: #E02424;
+  --page: var(--grey);
+  --line: #e3e8ea;
+  --field-border: #b8c1c7;
+  --pin-existing: #146b8c;
+  --pin-proposed: var(--green-dark);
+  --pin-replace: #c27803;
+  --pin-remove: #c0392b;
+  --danger: #c0392b;
+  --ok: var(--green-dark);
+  --offline-bg: #fff4e5;
+  --offline-text: #92400e;
+  --auth-bg: #fdecea;
+  --auth-text: #8a1c12;
+  --tap: 48px;
+  background: var(--page);
+  font-size: 15px;
+}
+
+/* Components below set display: grid/flex, which would otherwise override
+   the hidden attribute the app uses to show and hide them. */
+.survey-app [hidden] { display: none !important; }
+
+.sv-icon { width: 22px; height: 22px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- Packet Fusion brand bar (every screen) ----------------------------- */
+
+/* The logo artwork is the white knockout version, which the brand guide
+   places on Navy — so the bar is Packet Fusion Navy. */
+.sv-brandbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: var(--navy);
+  color: #fff;
+}
+.sv-brandbar-logo { flex-shrink: 0; line-height: 0; }
+.sv-brandbar-logo img { height: 40px; width: auto; }
+.sv-brandbar-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-brandbar .sv-status { color: rgba(255,255,255,.85); }
+.sv-brandbar .sv-status::before { box-shadow: none; }
+
+/* ---- Connection banner (only when offline / signed out / rejected) ------ */
+
+.sv-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  background: var(--offline-bg);
+  color: var(--offline-text);
+  border-bottom: 1px solid #f3d9b1;
+}
+.sv-banner.is-auth { background: var(--auth-bg); color: var(--auth-text); border-color: #f5c2bc; }
+.sv-banner button, .sv-banner a {
+  font: inherit; font-weight: 700; color: inherit; background: none; border: none; padding: 0;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* ---- Screen container --------------------------------------------------- */
+
+.sv-main { margin: 0 auto; }
+
+.sv-page {
+  position: relative;
+  background: #fff;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+.sv-body { padding: 18px 16px 8px; }
+
+.sv-loading, .sv-empty { color: var(--muted); font-size: 14px; padding: 28px 16px; text-align: center; }
+
+.sv-heading { margin: 0 0 14px; font-family: var(--font-body); font-size: 17px; font-weight: 500; color: var(--text); }
+.sv-heading.is-bold { font-family: var(--font-head); font-size: 20px; font-weight: 700; color: var(--navy); }
+.sv-hint { font-size: 13px; color: var(--muted); margin: 0; }
+
+.sv-cache-note {
+  display: inline-block;
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--offline-text);
+  background: var(--offline-bg);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.sv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sv-status::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px #fff;
+}
+.sv-status.is-offline::before { background: #f5a623; }
+.sv-status.is-auth::before { background: #ff6b5b; }
+.sv-status.is-syncing::before { background: var(--blue); animation: sv-pulse 1s ease-in-out infinite; }
+@keyframes sv-pulse { 50% { opacity: .3; } }
+
+/* ---- App bar (list, form, maps, plan) ----------------------------------- */
+
+.sv-appbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 0 6px;
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.sv-appbar-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-iconbtn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.sv-iconbtn:hover { background: rgba(255,255,255,.14); }
+.sv-iconbtn:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.sv-iconbtn .sv-icon { width: 24px; height: 24px; }
+.sv-iconbtn.is-ring .sv-icon { width: 30px; height: 30px; }
+
+/* ---- Big stacked buttons (site picker, briefing) ------------------------ */
+
+.sv-stack { display: grid; gap: 10px; }
+.sv-big-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 10px 56px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+}
+.sv-big-btn:hover { filter: brightness(0.93); }
+.sv-big-btn:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
+.sv-big-btn.is-alert { background: var(--alert); color: #fff; }
+.sv-big-btn .sv-count {
+  position: absolute;
+  right: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: .85;
+}
+
+/* ---- Briefing ----------------------------------------------------------- */
+
+.sv-brief { margin: 0 0 18px; font-size: 15px; line-height: 1.55; }
+.sv-brief p { margin: 0; }
+.sv-brief .gap { height: 14px; }
+.sv-brief a { color: var(--brand); font-weight: 600; text-decoration: none; }
+.sv-reveal {
+  margin-left: 6px;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+/* ---- Search + filter + flat list (mockup list screen) ------------------- */
+
+.sv-searchbar { position: relative; margin: 12px 12px 8px; }
+.sv-searchbar .sv-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 20px; height: 20px; }
+.sv-searchbar input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px 10px 42px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 16px; /* 16px stops iOS zooming on focus */
+  color: var(--text);
+}
+.sv-searchbar input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px rgba(56,96,178,.18); }
+
+.sv-filter {
+  margin: 0 12px 8px;
+  border: 2px solid var(--brand);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.sv-filter label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.sv-filter input {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  border: 2px solid var(--navy);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.sv-filter input::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--navy); transform: scale(0); transition: transform .1s; }
+.sv-filter input:checked::after { transform: scale(1); }
+.sv-filter input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.sv-listmeta { display: flex; justify-content: space-between; gap: 12px; padding: 4px 16px 6px; font-size: 12.5px; color: var(--muted); }
+
+.sv-flatlist { border-top: 1px solid var(--line); }
+.sv-flatrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  background: #fff;
+}
+.sv-flatrow:hover { background: #f6f8fa; }
+.sv-flatrow:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.sv-flatrow-main { flex: 1; min-width: 0; }
+.sv-flatrow-title { display: block; font-size: 15px; font-weight: 600; color: var(--navy); }
+.sv-flatrow-sub { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.sv-flatrow .sv-icon { color: #9aa5ad; width: 20px; height: 20px; flex-shrink: 0; }
+
+.sv-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  white-space: nowrap;
+}
+.sv-badge.is-pending { background: var(--offline-bg); color: var(--offline-text); }
+.sv-badge.is-done { background: var(--green-tint); color: var(--green-dark); }
+.sv-badge.is-flag { background: var(--auth-bg); color: var(--auth-text); }
+.sv-badge.is-muted { background: var(--grey); color: var(--text); }
+
+/* ---- Form (mockup record screen) ---------------------------------------- */
+
+.sv-form { display: grid; gap: 16px; }
+.sv-form-2col { display: grid; gap: 16px; }
+.sv-field { display: grid; gap: 6px; }
+.sv-field > .lbl { font-size: 14px; color: var(--text); }
+.sv-field > .lbl .req { color: var(--alert); font-weight: 700; margin-right: 4px; }
+.sv-field input, .sv-field textarea, .sv-select select {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+.sv-field textarea { min-height: 88px; resize: vertical; }
+.sv-field input:focus, .sv-field textarea:focus, .sv-select select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(56,96,178,.2);
+}
+.sv-field input:disabled, .sv-select select:disabled { background: #f2f5f7; color: var(--text); }
+
+/* Dropdown with the mockup's solid chevron block on the right. */
+.sv-select { position: relative; }
+.sv-select select { appearance: none; -webkit-appearance: none; padding-right: 58px; }
+.sv-select::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 46px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 22px no-repeat;
+  pointer-events: none;
+}
+.sv-select.is-disabled::after { opacity: .45; }
+
+.sv-item-card {
+  border-left: 4px solid var(--brand);
+  background: #eef2fa;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.sv-item-card strong { display: block; font-size: 15px; color: var(--navy); }
+.sv-item-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+.sv-segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sv-segmented label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 6px;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.sv-segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.sv-segmented label:has(input:checked) { border: 2px solid var(--brand); background: #eef2fa; color: var(--navy); }
+.sv-segmented label:has(input[value="working"]:checked) { border-color: var(--ok); background: var(--green-tint); color: var(--green-dark); }
+.sv-segmented label:has(input[value="not_working"]:checked) { border-color: var(--danger); background: var(--auth-bg); color: var(--auth-text); }
+.sv-segmented label:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.sv-pinfield {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  font-size: 15px;
+}
+.sv-pinfield.is-set { border-color: var(--ok); background: var(--green-tint); }
+
+/* Attachments box, as in the mockup. */
+.sv-attach {
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.sv-attach-empty { font-size: 14px; color: var(--text); }
+.sv-attach-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  font-size: 14px;
+  color: var(--navy);
+  cursor: pointer;
+}
+.sv-attach-add .sv-icon { width: 18px; height: 18px; }
+.sv-attach-add input { display: none; }
+.sv-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.sv-photo { position: relative; width: 84px; height: 84px; border-radius: 6px; overflow: hidden; background: var(--grey); }
+.sv-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sv-photo .sv-badge { position: absolute; left: 4px; bottom: 4px; }
+
+.sv-details { border: 1px solid var(--line); border-radius: 6px; padding: 0 12px; }
+.sv-details > summary { min-height: var(--tap); display: flex; align-items: center; font-weight: 600; color: var(--navy); cursor: pointer; }
+.sv-details[open] > summary { margin-bottom: 8px; }
+.sv-details > .sv-form { padding-bottom: 14px; }
+
+.sv-inline-form { display: grid; gap: 10px; padding: 12px; border-radius: 6px; background: #eef2fa; }
+
+.sv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sv-btn:hover { filter: brightness(0.93); }
+.sv-btn:disabled { opacity: .5; cursor: default; filter: none; }
+.sv-btn.is-secondary { background: #eef2fa; color: var(--navy); }
+.sv-btn.is-outline { background: #fff; color: var(--brand); border-color: var(--brand); }
+.sv-btn.is-danger { background: #fff; color: var(--danger); border-color: #f0c4be; }
+.sv-btn.is-small { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.sv-btn.is-block { width: 100%; }
+.sv-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.sv-actions .spacer { flex: 1; }
+
+.sv-error { font-size: 14px; color: var(--auth-text); background: var(--auth-bg); border-radius: 6px; padding: 10px 12px; }
+.sv-ok { font-size: 14px; color: var(--green-dark); background: var(--green-tint); border-radius: 6px; padding: 10px 12px; }
+
+/* ---- Welcome ------------------------------------------------------------ */
+
+.sv-welcome-title { margin: 0 0 14px; text-align: center; font-family: var(--font-head); font-size: 22px; font-weight: 600; color: var(--navy); }
+.sv-welcome-body { font-size: 14.5px; line-height: 1.5; }
+.sv-welcome-body p { margin: 0 0 12px; }
+.sv-welcome-body h2 { margin: 14px 0 4px; font-family: var(--font-body); font-size: 14.5px; font-weight: 700; color: var(--navy); }
+.sv-welcome-body ol { margin: 0 0 8px; padding-left: 22px; }
+.sv-welcome-body li { margin: 2px 0; }
+.sv-welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.sv-welcome-foot .sv-big-btn { padding: 10px 40px; min-width: 150px; }
+.sv-link { color: var(--brand); font-size: 14px; font-weight: 600; text-decoration: none; }
+
+/* ---- Maps --------------------------------------------------------------- */
+
+.sv-section { margin: 18px 0 8px; font-size: 12.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.sv-floorline { display: flex; align-items: center; gap: 8px; }
+.sv-floorline .sv-flatrow { flex: 1; border-bottom: 0; }
+
+/* ---- Floor plan --------------------------------------------------------- */
+
+.sv-sheets { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; padding-bottom: 2px; }
+.sv-sheets .sv-btn { white-space: nowrap; }
+.sv-sheets .sv-btn.is-active { background: var(--navy); color: #fff; }
+.sv-plan-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sv-zoom { display: inline-flex; gap: 4px; margin-left: auto; }
+.sv-placing-hint {
+  margin-bottom: 10px; padding: 10px 12px; border-radius: 6px;
+  background: var(--navy); color: #fff; font-size: 14px; font-weight: 600;
+}
+.sv-plan-wrap {
+  position: relative;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(100dvh - 200px);
+  background: var(--grey);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.sv-plan-stage { position: relative; width: 100%; }
+.sv-plan-stage.is-placing { cursor: crosshair; }
+/* While placing, a tap on an existing pin still places the new one there. */
+.sv-plan-stage.is-placing .sv-pin { pointer-events: none; }
+.sv-plan-stage canvas, .sv-plan-stage img.sv-plan-img { display: block; width: 100%; height: auto; background: #fff; }
+.sv-plan-note { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+
+.sv-pin {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--pin-existing);
+  color: #fff;
+  font: 700 12px/26px var(--font-body);
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  cursor: pointer;
+  padding: 0;
+}
+a.sv-pin { text-decoration: none; }
+.sv-pin.cond-proposed { background: var(--pin-proposed); }
+.sv-pin.cond-replace { background: var(--pin-replace); }
+.sv-pin.cond-remove { background: var(--pin-remove); }
+.sv-pin.is-other { opacity: .5; }
+.sv-pin.is-pending { outline: 2px dashed var(--offline-text); outline-offset: 2px; }
+.sv-pin.is-draft { background: var(--alert); animation: sv-pulse 1.2s ease-in-out infinite; pointer-events: none; }
+.sv-pin.is-flagged::after {
+  content: "!"; position: absolute; top: -8px; right: -8px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--danger); font-size: 11px; line-height: 16px;
+}
+
+/* ---- Sheets (support actions, rejected changes) ------------------------- */
+
+.sv-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 20, 33, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sv-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 14px 14px 0 0;
+  padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
+}
+.sv-sheet h2 { margin: 0 40px 6px 0; font-size: 18px; color: var(--navy); }
+.sv-sheet .close-btn { top: 12px; right: 12px; }
+
+/* ---- Tablets, iPad, desktop -------------------------------------------- */
+
+@media (min-width: 640px) {
+  .survey-app { --tap: 54px; font-size: 16px; }
+  .sv-main { max-width: 720px; padding: 24px 24px calc(48px + env(safe-area-inset-bottom)); }
+  .sv-main.is-wide { max-width: 1280px; }
+  .sv-page { min-height: auto; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,59,92,.10); padding-bottom: 28px; }
+  .sv-body { padding: 26px 28px 8px; }
+  .sv-brandbar { padding-left: 24px; padding-right: 24px; }
+  .sv-brandbar-logo img { height: 46px; }
+  .sv-brandbar-title { font-size: 19px; }
+  .sv-appbar { min-height: 60px; padding-left: 10px; padding-right: 10px; }
+  .sv-appbar-title { font-size: 19px; }
+  .sv-heading { font-size: 19px; }
+  .sv-big-btn { font-size: 17px; }
+  .sv-searchbar { margin: 16px 20px 10px; }
+  .sv-filter { margin: 0 20px 10px; }
+  .sv-flatrow { padding-left: 24px; padding-right: 18px; }
+  .sv-form-2col { grid-template-columns: 1fr 1fr; }
+  .sv-sheet-overlay { align-items: center; }
+  .sv-sheet { width: min(520px, 92vw); border-radius: 14px; }
+  .sv-plan-wrap { max-height: calc(100dvh - 240px); }
+}

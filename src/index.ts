@@ -1,9 +1,10 @@
 /**
- * LACCD Floorplan Catalog — edge entrypoint.
+ * PF Site Survey — edge entrypoint.
  *
- * Two classes of request:
+ * Three classes of request:
+ *   /api/*   → survey API backed by D1 (see ./api.ts)
  *   /pdfs/*  → streamed out of R2 (719 source drawings, ~380 MB)
- *   anything → the static bundle in ./public (shell, catalog.json, thumbnails)
+ *   anything → the static bundle in ./public (catalog, survey app, thumbnails)
  *
  * The PDFs deliberately sit behind the Worker rather than on a public R2
  * domain: it keeps a single hostname for Cloudflare Access to gate, and it
@@ -11,20 +12,30 @@
  */
 
 import { verifyAccess } from "./access";
+import { handleApi } from "./api";
 
 export interface Env {
   /** Static assets: frontend shell, catalog.json, and floor-plan thumbnails. */
   ASSETS: Fetcher;
   /** Source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf" (e.g. "ELAC/ELAC A5 Floor Plan.pdf"). */
   PDFS: R2Bucket;
+  /** Multi-project survey database — see migrations/0001_multi_project_schema.sql. */
+  DB: D1Database;
+  /** Survey photos, keyed "<project_code>/surveys/<survey_id>/photos/<photo_id>.<ext>". */
+  MEDIA: R2Bucket;
   /** Access team domain, e.g. "packetfusion.cloudflareaccess.com". Empty = no enforcement. */
   ACCESS_TEAM_DOMAIN: string;
   /** Access application AUD tag. Empty = no enforcement. */
   ACCESS_AUD: string;
+  /** Comma-separated emails allowed to change project setup (branding, briefings, imports). */
+  ADMIN_EMAILS?: string;
 }
 
 /** Requests under this prefix are served from R2 rather than from static assets. */
 const PDF_PREFIX = "/pdfs/";
+
+/** Survey API; must also be listed in assets.run_worker_first in wrangler.jsonc. */
+const API_PREFIX = "/api/";
 
 /**
  * Drawings are revised by re-export, not in place, so a long shared-cache TTL
@@ -45,6 +56,14 @@ const PDF_CACHE_CONTROL_PRIVATE = "private, max-age=3600";
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith(API_PREFIX)) {
+      // Survey data is the most sensitive thing served here, so it gets the
+      // same origin-side re-check as the drawings.
+      const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
+      if (!access.ok) return access.response;
+      return handleApi(request, env, access.identity?.email || null);
+    }
 
     if (url.pathname.startsWith(PDF_PREFIX)) {
       // Access gates the hostname at the edge; this re-checks the assertion so
