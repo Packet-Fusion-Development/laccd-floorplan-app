@@ -135,6 +135,38 @@ check for localhost only. Then `npm run db:migrate:local`,
 When changing a file listed in `SHELL` in `public/sw.js`, bump `VERSION` so
 installed apps refresh their offline copy.
 
+## Demo project: Packet Fusion University
+
+A fictitious campus for showing the app to peers without customer data.
+It is built by [scripts/build-demo.mjs](scripts/build-demo.mjs):
+
+- 5 sites. Sites 1–3 have 2 buildings × 3 floors; sites 4–5 have
+  5 buildings × 2 floors.
+- 500 users (100 per site) on five-digit extensions laid out as
+  site · building · floor · station. For example, `41203` is Site 4,
+  Building 1, 2nd floor, station 03, and Site N uses the N0000s.
+- 38 generated floor-plan PDFs, all marked "DEMO — FICTITIOUS".
+- Briefings, plus a few completed records at Site 1.
+
+```bash
+npm run demo:build                     # → data/demo/ (gitignored)
+npx wrangler d1 execute DB --env test --remote --file data/demo/pfu-demo.sql
+# upload each data/demo/plans/<key> to the MEDIA bucket under the same <key>:
+npx wrangler r2 object put "pf-site-survey-media-test/<key>" --file "data/demo/plans/<key>" --remote
+```
+
+Floor plans for any project other than LACCD live in the MEDIA bucket under
+`<project_code>/plans/…`. `/pdfs/*` serves those keys from MEDIA and everything
+else from the LACCD `laccd-floorplans` bucket.
+
+## Test copy
+
+`npx wrangler deploy --env test` deploys `pf-site-survey-test` to
+https://survey-test.packetfusion.com/survey. It has its own D1 database
+(`pf-site-survey-test`) and photo bucket (`pf-site-survey-media-test`). The
+hostname is a second public hostname on the `laccd-floorplan-app` Access
+application, so it shares that app's sign-in policy and AUD tag.
+
 ## Rename cutover
 
 The repo, Worker and app are being renamed from `laccd-floorplan-app` to

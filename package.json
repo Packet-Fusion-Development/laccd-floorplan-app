@@ -15,6 +15,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:seed:build": "node scripts/build-seed.mjs",
+    "demo:build": "node scripts/build-demo.mjs",
     "db:seed:local": "npm run db:seed:build && wrangler d1 execute DB --local --file data/seed/laccd.sql",
     "db:seed:remote": "npm run db:seed:build && wrangler d1 execute DB --remote --file data/seed/laccd.sql",
     "typecheck": "tsc --noEmit",

@@ -17,7 +17,7 @@ import { handleApi } from "./api";
 export interface Env {
   /** Static assets: frontend shell, catalog.json, and floor-plan thumbnails. */
   ASSETS: Fetcher;
-  /** Source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf" (e.g. "ELAC/ELAC A5 Floor Plan.pdf"). */
+  /** LACCD source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf". Other projects' plans are in MEDIA. */
   PDFS: R2Bucket;
   /** Multi-project survey database — see migrations/0001_multi_project_schema.sql. */
   DB: D1Database;
@@ -117,7 +117,11 @@ async function servePdf(
     if (cached) return cached;
   }
 
-  const object = await env.PDFS.get(key, {
+  // LACCD's drawings live in their own bucket (keys like "ELAC/…"). Drawings
+  // for every other project live with that project's media, under
+  // "<project_code>/plans/…", so a new customer never writes into LACCD's bucket.
+  const bucket = key.includes("/plans/") ? env.MEDIA : env.PDFS;
+  const object = await bucket.get(key, {
     range: request.headers,
     onlyIf: request.headers,
   });
