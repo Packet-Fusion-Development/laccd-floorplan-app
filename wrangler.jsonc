@@ -69,13 +69,11 @@
 
   // Multi-project survey data: customers, projects, sites, floor plans,
   // rooms, surveys, devices, photos. Schema in ./migrations.
-  // database_id is a placeholder until `npx wrangler d1 create pf-site-survey`
-  // is run against the account. Local dev (`--local`) works without it.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "pf-site-survey",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "515130f4-588f-43e9-9d57-2f8687524426",
       "migrations_dir": "migrations"
     }
   ],
