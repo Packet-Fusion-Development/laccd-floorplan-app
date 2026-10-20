@@ -82,6 +82,10 @@ export async function handleApi(request: Request, env: Env, user: string | null)
     if (method === "GET" && a === "results" && b && c === "export.csv") {
       return await resultsCsv(env, b, viewer, url.searchParams.get("view") === "customer");
     }
+    if (method === "GET" && a === "results" && b && c === "floors" && d) {
+      return json(await resultsFloor(env, b, d, viewer, url.searchParams.get("view") === "customer"));
+    }
+    if (method === "GET" && a === "results" && b && c === "plans" && d) return await resultsPlan(env, b, d);
 
     if (method === "GET" && a === "projects" && b && c === "access" && !d) {
       requireAdmin();
@@ -305,7 +309,7 @@ async function resultsSummary(env: Env, code: string, viewer: Viewer, preview: b
     categories,
     sites: data.sites.map(s => ({ code: s.code, name: s.name, ...(customerView ? {} : { id: s.id }) })),
     buildings: data.buildings.map(b => ({ site: idx(siteIdx, b.site_id), name: b.name })),
-    floors: data.floors.map(f => ({ building: idx(buildingIdx, f.building_id), name: f.name })),
+    floors: data.floors.map(f => ({ id: f.id, building: idx(buildingIdx, f.building_id), name: f.name })),
     rows,
     exceptions,
     photos: data.photoCount,
@@ -336,6 +340,82 @@ async function resultsCsv(env: Env, code: string, viewer: Viewer, preview: boole
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": `attachment; filename="${data.project.code}-results.csv"`,
       "cache-control": "no-store",
+    },
+  });
+}
+
+/**
+ * One floor for the results page: its plan sheets and every device recorded
+ * on it, with pin positions. The floor must belong to the project in the URL,
+ * which is what limits a customer to their own drawings.
+ */
+async function resultsFloor(env: Env, code: string, floorId: string, viewer: Viewer, preview: boolean) {
+  const project = await projectByCode(env, code);
+  const customerView = !viewer.internal || preview;
+  const floor = await env.DB.prepare(
+    `SELECT f.id, f.name, b.name AS building_name, s.name AS site_name, s.id AS site_id
+       FROM floors f JOIN buildings b ON b.id = f.building_id JOIN sites s ON s.id = b.site_id
+      WHERE f.id = ? AND s.project_id = ?`,
+  ).bind(floorId, project.id).first<Json>();
+  if (!floor) throw new HttpError(404, "Floor not found in this project.");
+
+  const [plans, devices] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT id, filename, wing_section FROM floor_plans
+        WHERE floor_id = ? AND is_supporting_document = 0 ORDER BY filename`,
+    ).bind(floorId),
+    env.DB.prepare(
+      `SELECT d.id AS device_id, d.floor_plan_id, d.pin_x, d.pin_y, d.category, d.test_result, d.discrepancy,
+              d.discrepancy_note, d.location_note, d.notes, d.updated_at, d.created_by,
+              d.inventory_item_id, i.name, i.extension, i.phone_number, i.listed_location
+         FROM devices d JOIN surveys sv ON sv.id = d.survey_id
+         LEFT JOIN inventory_items i ON i.id = d.inventory_item_id
+        WHERE d.floor_id = ? AND d.deleted_at IS NULL AND sv.project_id = ? AND sv.deleted_at IS NULL
+        ORDER BY d.updated_at`,
+    ).bind(floorId, project.id),
+  ]);
+
+  return {
+    floor: { id: floor.id, name: floor.name, building_name: floor.building_name, site_name: floor.site_name },
+    plans: (plans.results as Json[]).map(p => ({
+      id: p.id,
+      label: String(p.wing_section || String(p.filename).replace(/\.pdf$/i, "")),
+    })),
+    records: (devices.results as Json[]).map(d => ({
+      plan: d.floor_plan_id ?? null,
+      x: d.pin_x ?? null,
+      y: d.pin_y ?? null,
+      status: statusOf(d),
+      on_list: Boolean(d.inventory_item_id),
+      category: d.category,
+      name: d.name ?? null, extension: d.extension ?? null, phone_number: d.phone_number ?? null,
+      listed_location: d.listed_location ?? null, location_note: d.location_note ?? null,
+      discrepancy: d.discrepancy ?? null, discrepancy_note: d.discrepancy_note ?? null,
+      updated_at: d.updated_at ?? null,
+      ...(customerView ? {} : { device_id: d.device_id, site_id: floor.site_id, surveyed_by: d.created_by ?? null, notes: d.notes ?? null }),
+    })),
+  };
+}
+
+/** A plan's PDF, for the results page. Only plans in this project are served. */
+async function resultsPlan(env: Env, code: string, planId: string) {
+  const project = await projectByCode(env, code);
+  const plan = await env.DB.prepare(
+    `SELECT fp.r2_key FROM floor_plans fp JOIN floors f ON f.id = fp.floor_id
+       JOIN buildings b ON b.id = f.building_id JOIN sites s ON s.id = b.site_id
+      WHERE fp.id = ? AND s.project_id = ?`,
+  ).bind(planId, project.id).first<{ r2_key: string }>();
+  if (!plan) throw new HttpError(404, "Plan not found in this project.");
+  // Same split as /pdfs: LACCD drawings in their own bucket, everyone else's in MEDIA.
+  const bucket = plan.r2_key.includes("/plans/") ? env.MEDIA : env.PDFS;
+  const object = await bucket.get(plan.r2_key);
+  if (!object) throw new HttpError(404, "Plan file missing.");
+  return new Response(object.body, {
+    headers: {
+      "content-type": "application/pdf",
+      "content-length": String(object.size),
+      // Authenticated drawings: never in a shared cache.
+      "cache-control": "private, max-age=3600",
     },
   });
 }

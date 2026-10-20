@@ -150,7 +150,12 @@ always current. The page also refreshes itself every minute.
 - **Totals:** surveyed vs. remaining, Working / Not working / Can't test /
   Couldn't find, discrepancies, devices found that aren't on the list, photos.
 - **A card per site** with a status bar and per-category progress.
-  "Buildings and floors" opens the breakdown.
+  "Buildings and floors" opens a card per building with a bar per floor.
+- **View plan** on a floor shows its drawing with a pin per recorded device,
+  coloured and iconed by status (✓ ✕ – ?) with a ! for discrepancies. Tap a
+  pin for details. Plans are served by `GET /api/results/<project>/plans/<id>`,
+  which only returns plans in that project, so customers see their own drawings
+  and nothing else. pdf.js is exposed at `/results/pdfjs/`.
 - **Needs attention:** not working, couldn't find, discrepancies, not on the list.
 - **Export CSV** (`/api/results/<project>/export.csv`): one row per item.
 

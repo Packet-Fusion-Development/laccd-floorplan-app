@@ -166,6 +166,50 @@ button { font: inherit; }
 .rs-floor-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rs-floor-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rs-numbers > summary { padding: 12px 16px; font-weight: 600; color: var(--navy); cursor: pointer; }
+.rs-floor { grid-template-columns: minmax(84px, 7.5em) minmax(0, 1fr) auto auto; }
+.rs-plan-btn {
+  min-height: 32px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--green-dark);
+  background: #fff; color: var(--green-dark); font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.rs-plan-btn:hover { background: var(--green); border-color: var(--green); color: var(--navy-dark); }
+
+/* ---- Floor plan view --------------------------------------------------- */
+
+.rs-back { justify-self: start; border: 0; background: none; padding: 4px 0; color: var(--navy); font-weight: 700; cursor: pointer; }
+.rs-plan-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rs-zoom { display: inline-flex; gap: 6px; }
+.rs-zoom .rs-clear { min-width: 42px; font-size: 18px; }
+.rs-plan-wrap {
+  position: relative; overflow: auto; -webkit-overflow-scrolling: touch;
+  max-height: 68vh; background: var(--grey); border: 1px solid var(--border); border-radius: 12px;
+}
+.rs-plan-stage { position: relative; width: 100%; }
+.rs-plan-stage canvas { display: block; width: 100%; height: auto; background: #fff; }
+.rs-plan-stage.is-blank { aspect-ratio: 17 / 11; background: #fff; }
+.rs-pin {
+  position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; padding: 0;
+  border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 14px/24px var(--font-body);
+  text-align: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.rs-pin.is-dark-ink { color: var(--navy-dark); }
+.rs-pin.is-selected { outline: 3px solid var(--navy); outline-offset: 2px; z-index: 2; }
+.rs-pin.is-flagged::after {
+  content: "!"; position: absolute; top: -8px; right: -8px; width: 16px; height: 16px; border-radius: 50%;
+  background: #7a4a00; color: #fff; font-size: 11px; line-height: 16px; border: 1px solid #fff;
+}
+.rs-pin-key {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  color: #fff; font-size: 10px; font-style: normal; font-weight: 700;
+}
+.rs-pin-key.is-flag-key { background: #7a4a00; }
+.rs-pin-info { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+.rs-pin-info h3 { font-size: 16px; margin-bottom: 8px; }
+.rs-dl { margin: 0; display: grid; gap: 6px; }
+.rs-dl div { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 10px; }
+.rs-dl dt { color: var(--muted); font-size: 13px; }
+.rs-dl dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.rs-table tr[data-row] { cursor: pointer; }
+.rs-table tr.is-selected td { background: #eef6f1; }
 
 /* ---- Detail panel ------------------------------------------------------ */
 

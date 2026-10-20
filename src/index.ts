@@ -41,6 +41,9 @@ const PDF_PREFIX = "/pdfs/";
 /** Survey API; must also be listed in assets.run_worker_first in wrangler.jsonc. */
 const API_PREFIX = "/api/";
 
+/** pdf.js for the results page, served from public/vendor/pdfjs-3.11.174. */
+const RESULTS_PDFJS = "/results/pdfjs/";
+
 /** A project's results page, e.g. /results/laccd-dts. */
 const RESULTS_PAGE = /^\/results\/[a-z0-9_-]+\/?$/i;
 
@@ -68,6 +71,14 @@ export default {
     // static assets fall through to the Worker for "/".)
     if (url.pathname === "/") {
       return Response.redirect(new URL("/survey", url).toString(), 302);
+    }
+
+    // The results page renders plans with the vendored pdf.js. It is exposed
+    // under /results/ so a customer's Access scope (/results) covers it too.
+    if (url.pathname.startsWith(RESULTS_PDFJS)) {
+      const file = url.pathname.slice(RESULTS_PDFJS.length);
+      if (!/^pdf(\.worker)?\.min\.js$/.test(file)) return new Response("Not Found", { status: 404 });
+      return env.ASSETS.fetch(new Request(new URL(`/vendor/pdfjs-3.11.174/${file}`, url), request));
     }
 
     // /results/<project> is one static page that reads the code from the URL.

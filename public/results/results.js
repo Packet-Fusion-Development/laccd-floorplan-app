@@ -285,15 +285,16 @@
           <span class="rs-bpct"><b>${pct(c.done, c.items)}%</b> · ${fmt(c.done)} of ${fmt(c.items)}</span></div>
         ${bar(c, c.items + c.offList)}
         ${c.not_working || c.not_found || c.flagged || c.offList ? `<div class="rs-chips">${chips(c)}</div>` : ''}
-        ${floors.length ? `<div class="rs-floors">${floors.map(({ f, c: fc }) => `
+        ${floors.length ? `<div class="rs-floors">${floors.map(({ f, fi, c: fc }) => `
           <div class="rs-floor">
             <span class="rs-floor-name">${esc(f.name)}</span>
             ${bar(fc, fc.items + fc.offList, true)}
             <span class="rs-floor-n">${fmt(fc.done)} / ${fmt(fc.items)}</span>
+            <button class="rs-plan-btn" type="button" data-floor="${fi}" aria-label="View the ${esc(f.name)} plan">View plan</button>
           </div>`).join('')}</div>` : ''}
       </article>`;
     const cards = buildings.map(({ b, bi }) => bcard(b.name, bCounts.get(bi),
-      data.floors.map((f, fi) => ({ f, fi })).filter(({ f, fi }) => f.building === bi && fCounts.has(fi)).map(({ f, fi }) => ({ f, c: fCounts.get(fi) }))))
+      data.floors.map((f, fi) => ({ f, fi })).filter(({ f, fi }) => f.building === bi && fCounts.has(fi)).map(({ f, fi }) => ({ f, fi, c: fCounts.get(fi) }))))
       .join('') + (unplaced ? bcard('No building recorded', unplaced, []) : '');
 
     $('detailContent').innerHTML = `
@@ -317,9 +318,197 @@
       btn.setAttribute('aria-expanded', String(open));
       $('detailContent').querySelectorAll(`tr.b-${btn.dataset.b}`).forEach(tr => { tr.hidden = !open; });
     }));
+    $('detailContent').querySelectorAll('[data-floor]').forEach(btn => btn.addEventListener('click', () => {
+      openFloor(si, Number(btn.dataset.floor), fCounts.get(Number(btn.dataset.floor)));
+    }));
     bindTooltips($('detailContent'));
     $('detailOverlay').hidden = false;
+    $('detailOverlay').scrollTop = 0;
     $('detailClose').focus();
+  }
+
+  // ---- Floor plan with status pins ----------------------------------------
+
+  const ZOOMS = [1, 1.5, 2, 3];
+  const PLAN_PX = 2400;
+  const planCache = new Map();
+  let pdfjsReady = null;
+
+  function loadPdfJs() {
+    if (!pdfjsReady) {
+      pdfjsReady = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = '/results/pdfjs/pdf.min.js';
+        s.onload = () => {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/results/pdfjs/pdf.worker.min.js';
+          resolve(window.pdfjsLib);
+        };
+        s.onerror = () => { pdfjsReady = null; reject(new Error('Could not load the plan viewer.')); };
+        document.head.appendChild(s);
+      });
+    }
+    return pdfjsReady;
+  }
+
+  /** Renders page 1 of a plan to a canvas (cached; a canvas can be re-mounted). */
+  function planCanvas(planId) {
+    if (!planCache.has(planId)) {
+      planCache.set(planId, (async () => {
+        const pdfjs = await loadPdfJs();
+        const doc = await pdfjs.getDocument({ url: `/api/results/${encodeURIComponent(code)}/plans/${encodeURIComponent(planId)}`, withCredentials: true }).promise;
+        const page = await doc.getPage(1);
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: PLAN_PX / Math.max(base.width, base.height) });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        doc.destroy();
+        return canvas;
+      })().catch(err => { planCache.delete(planId); throw err; }));
+    }
+    return planCache.get(planId);
+  }
+
+  async function openFloor(si, fi, counts) {
+    const f = data.floors[fi];
+    const site = data.sites[si];
+    const box = $('detailContent');
+    box.innerHTML = `<button class="rs-back" type="button" id="floorBack">← ${esc(site.name)}</button><p class="rs-empty">Loading floor plan…</p>`;
+    $('floorBack').addEventListener('click', () => openSite(si));
+    $('detailOverlay').scrollTop = 0;
+
+    let floor;
+    try {
+      floor = await getJson(`/api/results/${encodeURIComponent(code)}/floors/${encodeURIComponent(f.id)}${data.view === 'customer' && data.can_preview ? '?view=customer' : ''}`);
+    } catch (err) {
+      box.insertAdjacentHTML('beforeend', `<p class="rs-empty">${esc(err.message)}</p>`);
+      return;
+    }
+    const ui2 = { plan: floor.plans[0]?.id ?? null, zoom: 0, selected: -1 };
+    const internal = data.view === 'internal';
+    const itemLabel = r => [r.extension || r.phone_number, r.name].filter(Boolean).join(' · ')
+      || (data.categories.find(c => c.key === r.category)?.title ?? 'Device') + (r.on_list ? '' : ' (not on list)');
+
+    const draw = () => {
+      const onPlan = floor.records.map((r, i) => ({ r, i })).filter(({ r }) => r.plan === ui2.plan && r.x != null);
+      const unpinned = floor.records.filter(r => r.x == null).length;
+      box.innerHTML = `
+        <button class="rs-back" type="button" id="floorBack">← ${esc(site.name)}</button>
+        <div><p class="rs-note">${esc(floor.floor.building_name)}</p><h2 id="detailTitle">${esc(floor.floor.name)}</h2></div>
+        ${counts ? `<div class="rs-bpct"><b>${pct(counts.done, counts.items)}%</b> surveyed · ${fmt(counts.done)} of ${fmt(counts.items)} on the list${counts.remaining ? ` · ${fmt(counts.remaining)} still to do` : ''}</div>` : ''}
+        <div class="rs-legend">${STATUS.filter(s => s.key !== 'remaining').map(s => `<span><i class="rs-pin-key" style="background:${s.color}">${s.icon}</i>${esc(s.label)}</span>`).join('')}
+          <span><i class="rs-pin-key is-flag-key">!</i>Discrepancy</span></div>
+        ${floor.plans.length > 1 ? `<div class="rs-tabs" style="padding:0">${floor.plans.map(p => `
+          <button class="rs-tab" type="button" data-plan="${esc(p.id)}" aria-selected="${p.id === ui2.plan}">${esc(p.label)}</button>`).join('')}</div>` : ''}
+        ${ui2.plan ? `
+          <div class="rs-plan-tools">
+            <span class="rs-note">${fmt(onPlan.length)} pinned on this plan${unpinned ? ` · ${fmt(unpinned)} recorded without a pin` : ''}</span>
+            <span class="rs-zoom">
+              <button type="button" class="rs-clear" id="zoomOut" aria-label="Zoom out">−</button>
+              <button type="button" class="rs-clear" id="zoomIn" aria-label="Zoom in">+</button>
+            </span>
+          </div>
+          <div class="rs-plan-wrap" id="planWrap">
+            <div class="rs-plan-stage" id="planStage" style="width:${ZOOMS[ui2.zoom] * 100}%">
+              <p class="rs-empty" id="planLoading">Loading drawing…</p>
+              ${onPlan.map(({ r, i }) => {
+                const s = STATUS_BY_KEY[r.status];
+                const flag = r.discrepancy && r.discrepancy !== 'not_found';
+                return `<button type="button" class="rs-pin ${flag ? 'is-flagged' : ''} ${i === ui2.selected ? 'is-selected' : ''} ${r.status === 'not_tested' ? 'is-dark-ink' : ''}"
+                  style="left:${r.x * 100}%;top:${r.y * 100}%;background:${s.color}" data-rec="${i}"
+                  aria-label="${esc(`${itemLabel(r)}: ${s.label}${flag ? ', discrepancy' : ''}`)}">${s.icon}</button>`;
+              }).join('')}
+            </div>
+          </div>` : '<p class="rs-empty">No floor plan on file for this floor.</p>'}
+        <div class="rs-card rs-pin-info" id="pinInfo">${ui2.selected >= 0 ? recordDetail(floor.records[ui2.selected]) : 'Tap a pin to see what was recorded there.'}</div>
+        <div class="rs-card rs-table-wrap">
+          <table class="rs-table">
+            <thead><tr><th>Item</th><th>Status</th><th>Where</th><th>Note</th><th>Date</th>${internal ? '<th>Surveyed by</th><th></th>' : ''}</tr></thead>
+            <tbody>${floor.records.map((r, i) => `
+              <tr data-row="${i}" class="${i === ui2.selected ? 'is-selected' : ''}">
+                <td>${esc(itemLabel(r))}</td>
+                <td>${statusCell(r)}</td>
+                <td>${esc(r.location_note || r.listed_location || '')}${r.x == null ? '<br><span class="muted">No pin</span>' : ''}</td>
+                <td>${esc(r.discrepancy_note || '')}${internal && r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ''}</td>
+                <td class="muted">${esc(date(r.updated_at))}</td>
+                ${internal ? `<td class="muted">${esc(r.surveyed_by || '')}</td><td>${r.device_id ? `<a href="/survey#/p/${encodeURIComponent(code)}/site/${encodeURIComponent(r.site_id)}/c/${encodeURIComponent(r.category || 'all')}/r/dev-${encodeURIComponent(r.device_id)}">Open</a>` : ''}</td>` : ''}
+              </tr>`).join('') || `<tr><td colspan="${internal ? 7 : 5}" class="muted">Nothing recorded on this floor yet.</td></tr>`}</tbody>
+          </table>
+        </div>`;
+
+      $('floorBack').addEventListener('click', () => openSite(si));
+      box.querySelectorAll('[data-plan]').forEach(b => b.addEventListener('click', () => { ui2.plan = b.dataset.plan; ui2.selected = -1; draw(); }));
+      $('zoomIn')?.addEventListener('click', () => zoom(+1));
+      $('zoomOut')?.addEventListener('click', () => zoom(-1));
+      const select = i => {
+        ui2.selected = i;
+        $('pinInfo').innerHTML = recordDetail(floor.records[i]);
+        box.querySelectorAll('.rs-pin').forEach(p => p.classList.toggle('is-selected', Number(p.dataset.rec) === i));
+        box.querySelectorAll('tr[data-row]').forEach(t => t.classList.toggle('is-selected', Number(t.dataset.row) === i));
+      };
+      box.querySelectorAll('.rs-pin').forEach(p => p.addEventListener('click', () => {
+        select(Number(p.dataset.rec));
+        $('pinInfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }));
+      box.querySelectorAll('tr[data-row]').forEach(t => t.addEventListener('click', e => {
+        if (e.target.closest('a')) return;
+        const i = Number(t.dataset.row);
+        select(i);
+        const pin = box.querySelector(`.rs-pin[data-rec="${i}"]`);
+        if (pin) pin.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      }));
+
+      if (ui2.plan) {
+        const stage = $('planStage');
+        planCanvas(ui2.plan).then(canvas => {
+          if (!stage.isConnected) return;
+          stage.prepend(canvas);
+          $('planLoading')?.remove();
+        }).catch(() => {
+          const l = $('planLoading');
+          if (l) l.textContent = "The drawing couldn't be loaded. Pins are shown on a blank sheet.";
+          stage.classList.add('is-blank');
+        });
+      }
+    };
+
+    const zoom = step => {
+      const wrap = $('planWrap'), stage = $('planStage');
+      if (!wrap || !stage) return;
+      const cx = (wrap.scrollLeft + wrap.clientWidth / 2) / stage.offsetWidth;
+      const cy = (wrap.scrollTop + wrap.clientHeight / 2) / stage.offsetHeight;
+      ui2.zoom = Math.min(ZOOMS.length - 1, Math.max(0, ui2.zoom + step));
+      stage.style.width = `${ZOOMS[ui2.zoom] * 100}%`;
+      wrap.scrollLeft = cx * stage.offsetWidth - wrap.clientWidth / 2;
+      wrap.scrollTop = cy * stage.offsetHeight - wrap.clientHeight / 2;
+    };
+
+    draw();
+  }
+
+  function statusCell(r) {
+    const s = STATUS_BY_KEY[r.status];
+    const flag = r.discrepancy && r.discrepancy !== 'not_found'
+      ? `<br><span class="rs-chip is-flag">⚑ ${esc(DISCREPANCY[r.discrepancy] || r.discrepancy)}</span>` : '';
+    return `<span class="rs-status"><i class="rs-swatch" style="background:${s.color}"></i>${esc(s.label)}</span>${flag}`;
+  }
+
+  function recordDetail(r) {
+    if (!r) return '';
+    const internal = data.view === 'internal';
+    const label = [r.extension || r.phone_number, r.name].filter(Boolean).join(' · ')
+      || (data.categories.find(c => c.key === r.category)?.title ?? 'Device');
+    const rows = [
+      ['Status', statusCell(r)],
+      ['On the list', r.on_list ? 'Yes' : 'No: found on site'],
+      ['Listed location', esc(r.listed_location || '')],
+      ['Found at', esc(r.location_note || '')],
+      ['Note', esc(r.discrepancy_note || '')],
+      ['Recorded', esc(date(r.updated_at))],
+      ...(internal ? [['Surveyed by', esc(r.surveyed_by || '')], ['Engineer notes', esc(r.notes || '')]] : []),
+    ].filter(([, v]) => v);
+    return `<h3>${esc(label)}</h3><dl class="rs-dl">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
   }
 
   function drawExceptions() {
