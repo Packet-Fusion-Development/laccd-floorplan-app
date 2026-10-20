@@ -1,7 +1,8 @@
 /**
- * Builds public/catalog.json from data/catalog.json.
+ * Builds public/catalog.json (the LACCD floor-plan library at /laccd) from
+ * data/laccd/catalog.json.
  *
- * data/catalog.json is the tracked source of truth (pretty-printed, reviewable
+ * data/laccd/catalog.json is the tracked source of truth (pretty-printed, reviewable
  * in diffs). The served copy is minified and generated at build time, so the
  * repo never carries two copies of the same 680 KB.
  *
@@ -12,8 +13,8 @@ import { readFile, writeFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SOURCE = join(root, "data", "catalog.json");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const SOURCE = join(root, "data", "laccd", "catalog.json");
 const OUTPUT = join(root, "public", "catalog.json");
 
 const REQUIRED_FIELDS = [

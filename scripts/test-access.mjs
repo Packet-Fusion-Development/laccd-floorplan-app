@@ -65,7 +65,7 @@ function mintToken({ header = {}, payload = {}, signWith = privateKey, tamper = 
 }
 
 const withToken = (token) =>
-  new Request("https://laccd-floorplan-app.packetfusion.com/pdfs/LAVC/x.pdf", {
+  new Request("https://survey.packetfusion.com/pdfs/LAVC/x.pdf", {
     headers: token ? { "cf-access-jwt-assertion": token } : {},
   });
 
@@ -138,7 +138,7 @@ await check(
 // The cookie path browsers use on navigations.
 await check(
   "valid cookie allowed",
-  new Request("https://laccd-floorplan-app.packetfusion.com/pdfs/LAVC/x.pdf", {
+  new Request("https://survey.packetfusion.com/pdfs/LAVC/x.pdf", {
     headers: { cookie: `CF_Authorization=${mintToken()}; other=1` },
   }),
   "allow",

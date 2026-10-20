@@ -9,9 +9,9 @@
  * Safe to re-run — by default it skips objects already present at the same
  * size. Pass --force to overwrite regardless.
  *
- *   npm run upload:pdfs
- *   npm run upload:pdfs -- --force
- *   npm run upload:pdfs -- --dry-run
+ *   npm run laccd:upload-pdfs
+ *   npm run laccd:upload-pdfs -- --force
+ *   npm run laccd:upload-pdfs -- --dry-run
  *
  * Credentials come from .env (see .env.example). Create an R2 API token with
  * Object Read & Write on the laccd-floorplans bucket.
@@ -25,7 +25,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PDF_DIR = join(root, "pdfs");
 const CONCURRENCY = 8;
 

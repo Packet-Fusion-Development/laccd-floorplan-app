@@ -4,7 +4,8 @@
  * Three classes of request:
  *   /api/*   → survey API backed by D1 (see ./api.ts)
  *   /pdfs/*  → streamed out of R2 (719 source drawings, ~380 MB)
- *   anything → the static bundle in ./public (catalog, survey app, thumbnails)
+ *   /        → redirect to /survey
+ *   anything → the static bundle in ./public (survey app, LACCD library at /laccd, thumbnails)
  *
  * The PDFs deliberately sit behind the Worker rather than on a public R2
  * domain: it keeps a single hostname for Cloudflare Access to gate, and it
@@ -56,6 +57,12 @@ const PDF_CACHE_CONTROL_PRIVATE = "private, max-age=3600";
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // The site root is the survey app. (There is no public/index.html, so
+    // static assets fall through to the Worker for "/".)
+    if (url.pathname === "/") {
+      return Response.redirect(new URL("/survey", url).toString(), 302);
+    }
 
     if (url.pathname.startsWith(API_PREFIX)) {
       // Survey data is the most sensitive thing served here, so it gets the
