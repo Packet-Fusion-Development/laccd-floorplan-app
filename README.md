@@ -140,6 +140,51 @@ offline. If a PDF can't load, the plan falls back to its thumbnail.
 When changing a file listed in `SHELL` in `public/sw.js`, bump `VERSION` so
 installed apps refresh their offline copy.
 
+## Results page
+
+`/results/<project>` shows live totals for a project, styled like the LACCD
+catalog. The page is [public/results/](public/results/); the data comes from
+`GET /api/results/<project>`, calculated from D1 on every request, so it is
+always current. The page also refreshes itself every minute.
+
+- **Totals:** surveyed vs. remaining, Working / Not working / Can't test /
+  Couldn't find, discrepancies, devices found that aren't on the list, photos.
+- **A card per site** with a status bar and per-category progress.
+  "Buildings and floors" opens the breakdown.
+- **Needs attention:** not working, couldn't find, discrepancies, not on the list.
+- **Export CSV** (`/api/results/<project>/export.csv`): one row per item.
+
+**Two audiences, one page.** The API decides which version to return:
+
+| | Internal (Packet Fusion staff) | Customer |
+|---|---|---|
+| Who | Emails in `INTERNAL_DOMAINS` (default `packetfusion.com`) or `ADMIN_EMAILS` | Addresses or `@domains` listed in `project_access` for that project |
+| Sees | Every project; who surveyed each record, engineers' notes, links into the survey app, a "Preview customer view" switch | Only their projects' results, without staff names, notes or record ids |
+| Can reach | Everything | **Only** `GET /api/me` and `/api/results/<their project>`. The Worker returns 403 for every other API route and for `/pdfs/*`. |
+
+Admins give customers access in **Project setup → Results and customer access**.
+
+**Cloudflare Access for customers (one-time setup).** Customers aren't on
+Packet Fusion's Entra login, so they need their own way to sign in:
+
+1. In Zero Trust → Access controls → Applications, create a self-hosted
+   application with two destinations, `<host>/results` and `<host>/api/results`,
+   on the survey hostname (and on `survey-test` to try it). Path-specific
+   applications take precedence over the hostname-wide one, so this app
+   decides who reaches the results pages.
+2. Login methods: **One-time PIN** (customers get an emailed code). Keep
+   Microsoft Entra ID as well, so staff can still open the pages.
+3. Policy: Allow, Include **Emails ending in** each customer's domain (or
+   specific emails), plus `@packetfusion.com`.
+
+Everything a results page loads lives under `/results/` (its own CSS, script
+and logo copy), so customers never need access to anything else. The Worker
+enforces the per-project limit regardless of how Access is set up.
+
+**Local testing as a customer:** with Access off (`.dev.vars`), send the
+header `x-dev-user: someone@customer.edu`. The Worker ignores this header
+whenever Access is configured.
+
 ## Develop
 
 ```bash

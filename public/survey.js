@@ -436,7 +436,10 @@ async function viewWelcome(code, stale) {
       <p>Your progress saves as you go.</p>
     </div>
     <div class="sv-welcome-foot">
-      ${me.is_admin ? `<a class="sv-link" href="#/p/${enc(code)}/setup">Project setup</a>` : '<span></span>'}
+      <span class="sv-actions" style="gap:16px">
+        ${me.internal !== false ? `<a class="sv-link" href="/results/${enc(code)}">Results</a>` : ''}
+        ${me.is_admin ? `<a class="sv-link" href="#/p/${enc(code)}/setup">Project setup</a>` : ''}
+      </span>
       <a class="sv-big-btn" href="#/p/${enc(code)}/sites" id="startBtn">Start</a>
     </div>
   </div></div>`);
@@ -1462,8 +1465,22 @@ async function viewSetup(code, stale) {
       <div id="importMsg" hidden></div>
     </div>
 
-    <div class="sv-section">Reports</div>
-    <a class="sv-btn is-outline" href="/api/projects/${enc(code)}/devices.csv" download>${icon('download')} Download all survey results (CSV)</a>
+    <div class="sv-section">Results and customer access</div>
+    <div class="sv-form">
+      <div class="sv-actions">
+        <a class="sv-btn" href="/results/${enc(code)}">Open the results page</a>
+        <a class="sv-btn is-outline" href="/api/projects/${enc(code)}/devices.csv" download>${icon('download')} Full survey data (CSV)</a>
+      </div>
+      <p class="sv-hint">Customers listed here can open the results page for this project only: totals, sites and the follow-up list, without staff names. They can't see the survey app or any other project. Add a person's email, or a whole domain such as <b>@customer.edu</b>.</p>
+      <div class="sv-flatlist" id="accessList" style="border:1px solid var(--line);border-radius:6px"></div>
+      <form class="sv-actions" id="accessForm">
+        <label class="sv-field" style="flex:1;min-width:0"><span class="lbl" hidden>Customer email or domain</span>
+          <input name="principal" id="accessInput" placeholder="jane@customer.edu or @customer.edu" autocomplete="off" aria-label="Customer email or domain"></label>
+        <button class="sv-btn" type="submit">Give access</button>
+      </form>
+      <div id="accessMsg" hidden></div>
+      <p class="sv-hint">Customer link: <b id="resultsLink"></b></p>
+    </div>
     </div>
   </div>`);
 
@@ -1473,6 +1490,35 @@ async function viewSetup(code, stale) {
     el.textContent = text;
     el.hidden = false;
   };
+
+  // Customer access to the results page
+  document.getElementById('resultsLink').textContent = `${location.origin}/results/${code}`;
+  const drawAccess = list => {
+    document.getElementById('accessList').innerHTML = list.map(a => `
+      <div class="sv-flatrow" style="min-height:52px">
+        <span class="sv-flatrow-main"><span class="sv-flatrow-title">${esc(a.principal)}</span>
+        <span class="sv-flatrow-sub">${a.principal.startsWith('@') ? 'Everyone at this domain' : 'One person'} · added by ${esc(a.created_by || 'unknown')}</span></span>
+        <button class="sv-btn is-small is-danger" type="button" data-remove-access="${esc(a.id)}">Remove</button>
+      </div>`).join('') || '<p class="sv-hint" style="padding:12px 16px">No customers have access yet.</p>';
+    document.querySelectorAll('[data-remove-access]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Remove this access? They will no longer be able to open the results.')) return;
+      try {
+        drawAccess(await apiDirect('DELETE', `/api/projects/${enc(code)}/access/${enc(b.dataset.removeAccess)}`));
+      } catch (err) { msg('accessMsg', false, err.message); }
+    }));
+  };
+  apiDirect('GET', `/api/projects/${enc(code)}/access`).then(drawAccess).catch(err => msg('accessMsg', false, err.message));
+  document.getElementById('accessForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('accessInput');
+    try {
+      drawAccess(await apiDirect('POST', `/api/projects/${enc(code)}/access`, JSON.stringify({ principal: input.value.trim() }), 'application/json'));
+      input.value = '';
+      msg('accessMsg', true, 'Access given. Send them the customer link below.');
+    } catch (err) {
+      msg('accessMsg', false, err.message);
+    }
+  });
 
   const catList = document.getElementById('catList');
   const bindRemove = () => catList.querySelectorAll('[data-remove-cat]').forEach(b => {

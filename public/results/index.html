@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Survey Results — Packet Fusion Site Survey</title>
+<!-- Everything this page loads lives under /results/, so a customer's Access
+     policy can be scoped to /results and /api/results alone. -->
+<link rel="stylesheet" href="/results/results.css">
+</head>
+<body>
+
+<header class="rs-header">
+  <div class="rs-header-top">
+    <img class="rs-logo" src="/results/packet-fusion-logo-white.png" alt="Packet Fusion — Powered by Bridgepointe Technologies">
+    <div class="rs-header-actions" id="headerActions"></div>
+  </div>
+  <p class="rs-eyebrow">Packet Fusion Site Survey · Results</p>
+  <h1 id="projectName">Survey results</h1>
+  <p class="rs-subtitle" id="subtitle">Loading…</p>
+</header>
+
+<main class="rs-main" id="main">
+  <p class="rs-empty">Loading results…</p>
+</main>
+
+<!-- Site breakdown: buildings and floors, like the catalog's detail panel. -->
+<div class="rs-overlay" id="detailOverlay" hidden>
+  <div class="rs-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <button class="rs-close" type="button" id="detailClose" aria-label="Close">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div class="rs-tooltip" id="tooltip" role="tooltip" hidden></div>
+
+<script src="/results/results.js"></script>
+</body>
+</html>

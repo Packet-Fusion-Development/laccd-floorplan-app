@@ -62,8 +62,39 @@ export async function handleApi(request: Request, env: Env, user: string | null)
 
   try {
     const [a, b, c, d] = parts;
+    const viewer = await resolveViewer(env, user);
 
-    if (method === "GET" && a === "me" && !b) return json({ email: who, is_admin: admin });
+    // Customers get the results of their own projects and nothing else —
+    // not the survey app's data, not setup, not other customers.
+    if (!viewer.internal) {
+      const own = method === "GET" && ((a === "me" && !b) || (a === "results" && (!b || viewer.projects?.has(b))));
+      if (!own) throw new HttpError(403, "This account can only view its project results.");
+    }
+
+    if (method === "GET" && a === "me" && !b) {
+      return json({ email: who, is_admin: admin, internal: viewer.internal, projects: viewer.projects ? [...viewer.projects] : null });
+    }
+
+    if (method === "GET" && a === "results" && !b) return json(await resultsProjects(env, viewer));
+    if (method === "GET" && a === "results" && b && !c) {
+      return json(await resultsSummary(env, b, viewer, url.searchParams.get("view") === "customer"));
+    }
+    if (method === "GET" && a === "results" && b && c === "export.csv") {
+      return await resultsCsv(env, b, viewer, url.searchParams.get("view") === "customer");
+    }
+
+    if (method === "GET" && a === "projects" && b && c === "access" && !d) {
+      requireAdmin();
+      return json(await listAccess(env, b));
+    }
+    if (method === "POST" && a === "projects" && b && c === "access" && !d) {
+      requireAdmin();
+      return json(await addAccess(env, b, await body(request), who));
+    }
+    if (method === "DELETE" && a === "projects" && b && c === "access" && d) {
+      requireAdmin();
+      return json(await removeAccess(env, b, d));
+    }
 
     if (method === "GET" && a === "projects" && !b) return json(await listProjects(env));
     if (method === "GET" && a === "projects" && b && !c) return json(await projectOverview(env, b));
@@ -111,6 +142,236 @@ export async function handleApi(request: Request, env: Env, user: string | null)
     console.error("api error", url.pathname, message);
     return json({ error: "Internal error." }, 500);
   }
+}
+
+// ---- Who is asking ---------------------------------------------------------
+
+/**
+ * Packet Fusion staff are "internal" and see everything. Anyone else is a
+ * customer, limited to the projects listed for their address or domain in
+ * project_access. With no Access identity (local dev) the caller is internal.
+ */
+export interface Viewer {
+  email: string | null;
+  internal: boolean;
+  /** Project codes a customer may see; null for internal (all projects). */
+  projects: Set<string> | null;
+}
+
+export async function resolveViewer(env: Env, user: string | null): Promise<Viewer> {
+  if (!user) return { email: null, internal: true, projects: null };
+  const email = user.toLowerCase();
+  const domain = email.slice(email.lastIndexOf("@") + 1);
+  const internalDomains = (env.INTERNAL_DOMAINS || "packetfusion.com").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (internalDomains.includes(domain) || isAdmin(env, user)) return { email, internal: true, projects: null };
+
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT p.code FROM project_access a JOIN projects p ON p.id = a.project_id
+      WHERE a.principal IN (?, ?) AND p.status != 'archived'`,
+  ).bind(email, `@${domain}`).all<{ code: string }>();
+  return { email, internal: false, projects: new Set(results.map(r => r.code)) };
+}
+
+// ---- Results ---------------------------------------------------------------
+
+async function resultsProjects(env: Env, viewer: Viewer) {
+  const all = await listProjects(env);
+  return all
+    .filter(p => viewer.internal || viewer.projects?.has(String(p.code)))
+    .map(p => ({ code: p.code, name: p.name, customer_name: p.customer_name }));
+}
+
+/** Status of one list item, for the results page. */
+type ItemStatus = "remaining" | "working" | "not_working" | "not_tested" | "not_found" | "done";
+
+function statusOf(row: Json): ItemStatus {
+  if (!row.device_id) return "remaining";
+  if (row.discrepancy === "not_found") return "not_found";
+  if (row.test_result === "working" || row.test_result === "not_working" || row.test_result === "not_tested") return row.test_result;
+  return "done";
+}
+
+async function loadResults(env: Env, code: string) {
+  const project = await projectByCode(env, code);
+  const [sites, buildings, floors, items, extras, photos] = await env.DB.batch([
+    env.DB.prepare(`SELECT id, code, name FROM sites WHERE project_id = ? ORDER BY name`).bind(project.id),
+    env.DB.prepare(
+      `SELECT b.id, b.site_id, b.name FROM buildings b JOIN sites s ON s.id = b.site_id
+        WHERE s.project_id = ? ORDER BY b.name`,
+    ).bind(project.id),
+    env.DB.prepare(
+      `SELECT f.id, f.building_id, f.name FROM floors f JOIN buildings b ON b.id = f.building_id
+         JOIN sites s ON s.id = b.site_id WHERE s.project_id = ? ORDER BY f.name`,
+    ).bind(project.id),
+    // Each list item with its latest record, if any.
+    env.DB.prepare(
+      `SELECT i.id, i.site_id, i.building_id, i.floor_id, i.category, i.name, i.extension, i.phone_number,
+              i.listed_location, d.id AS device_id, d.test_result, d.discrepancy, d.discrepancy_note,
+              d.location_note, d.notes, d.updated_at, d.created_by, d.survey_id
+         FROM inventory_items i
+         LEFT JOIN devices d ON d.id = (
+           SELECT d2.id FROM devices d2 WHERE d2.inventory_item_id = i.id AND d2.deleted_at IS NULL
+            ORDER BY d2.updated_at DESC LIMIT 1)
+        WHERE i.project_id = ? AND i.deleted_at IS NULL`,
+    ).bind(project.id),
+    // Devices found that are not on the list.
+    env.DB.prepare(
+      `SELECT d.id AS device_id, sv.site_id, COALESCE(d.building_id, f.building_id) AS building_id, d.floor_id,
+              d.category, d.test_result, d.discrepancy, d.discrepancy_note, d.location_note, d.notes,
+              d.updated_at, d.created_by, d.attributes
+         FROM devices d JOIN surveys sv ON sv.id = d.survey_id LEFT JOIN floors f ON f.id = d.floor_id
+        WHERE sv.project_id = ? AND sv.deleted_at IS NULL AND d.deleted_at IS NULL AND d.inventory_item_id IS NULL`,
+    ).bind(project.id),
+    env.DB.prepare(
+      `SELECT count(*) AS n FROM photos p JOIN surveys sv ON sv.id = p.survey_id
+        WHERE sv.project_id = ? AND p.deleted_at IS NULL`,
+    ).bind(project.id),
+  ]);
+  return {
+    project,
+    sites: sites.results as Json[],
+    buildings: buildings.results as Json[],
+    floors: floors.results as Json[],
+    items: items.results as Json[],
+    extras: extras.results as Json[],
+    photoCount: Number((photos.results as Json[])[0]?.n ?? 0),
+  };
+}
+
+/**
+ * Everything the results page needs, compact enough to filter in the browser.
+ *
+ * rows: one per list item and per device found off-list, as
+ *   [siteIdx, buildingIdx, floorIdx, categoryIdx, status, flagged, onList]
+ * where status is one of ItemStatus and -1 marks an unknown building/floor.
+ * exceptions: the records a reader needs to act on — not working, couldn't
+ * find, any discrepancy, and devices found off the list.
+ *
+ * The customer view leaves out who surveyed each record and engineers' notes.
+ */
+async function resultsSummary(env: Env, code: string, viewer: Viewer, preview: boolean) {
+  const data = await loadResults(env, code);
+  const customerView = !viewer.internal || preview;
+  const settings = data.project.settings;
+  const categories = ((Array.isArray(settings.categories) ? settings.categories : DEFAULT_CATEGORIES) as Json[])
+    .map(c => ({ key: String(c.key), label: String(c.label), title: String(c.title ?? c.label) }));
+
+  const siteIdx = new Map(data.sites.map((s, i) => [s.id, i]));
+  const buildingIdx = new Map(data.buildings.map((b, i) => [b.id, i]));
+  const floorIdx = new Map(data.floors.map((f, i) => [f.id, i]));
+  const catIdx = new Map(categories.map((c, i) => [c.key, i]));
+  const catOf = (key: unknown) => {
+    const k = String(key ?? "");
+    if (!catIdx.has(k)) {
+      catIdx.set(k, categories.length);
+      categories.push({ key: k, label: k || "Other", title: k || "Other" });
+    }
+    return catIdx.get(k)!;
+  };
+  const idx = (map: Map<unknown, number>, id: unknown) => map.get(id) ?? -1;
+
+  const rows: Array<[number, number, number, number, ItemStatus, 0 | 1, 0 | 1]> = [];
+  const exceptions: Json[] = [];
+  const exception = (r: Json, status: ItemStatus, onList: boolean) => {
+    const e: Json = {
+      site: idx(siteIdx, r.site_id), building: idx(buildingIdx, r.building_id), floor: idx(floorIdx, r.floor_id),
+      category: catOf(r.category), status, on_list: onList,
+      name: r.name ?? null, extension: r.extension ?? null, phone_number: r.phone_number ?? null,
+      listed_location: r.listed_location ?? null, location_note: r.location_note ?? null,
+      discrepancy: r.discrepancy ?? null, discrepancy_note: r.discrepancy_note ?? null,
+      updated_at: r.updated_at ?? null,
+    };
+    if (!customerView) Object.assign(e, { device_id: r.device_id, surveyed_by: r.created_by ?? null, notes: r.notes ?? null });
+    exceptions.push(e);
+  };
+
+  for (const r of data.items) {
+    const status = statusOf(r);
+    const flagged = r.discrepancy && r.discrepancy !== "not_found" ? 1 : 0;
+    rows.push([idx(siteIdx, r.site_id), idx(buildingIdx, r.building_id), idx(floorIdx, r.floor_id), catOf(r.category), status, flagged, 1]);
+    if (status === "not_working" || status === "not_found" || flagged) exception(r, status, true);
+  }
+  for (const r of data.extras) {
+    const status = statusOf(r);
+    rows.push([idx(siteIdx, r.site_id), idx(buildingIdx, r.building_id), idx(floorIdx, r.floor_id), catOf(r.category), status, 1, 0]);
+    exception(r, status, false);
+  }
+
+  return {
+    project: { code: data.project.code, name: data.project.name, customer_name: data.project.customer_name, site_label: settings.site_label ?? null },
+    view: customerView ? "customer" : "internal",
+    can_preview: viewer.internal,
+    generated_at: new Date().toISOString(),
+    categories,
+    sites: data.sites.map(s => ({ code: s.code, name: s.name, ...(customerView ? {} : { id: s.id }) })),
+    buildings: data.buildings.map(b => ({ site: idx(siteIdx, b.site_id), name: b.name })),
+    floors: data.floors.map(f => ({ building: idx(buildingIdx, f.building_id), name: f.name })),
+    rows,
+    exceptions,
+    photos: data.photoCount,
+  };
+}
+
+const STATUS_LABELS: Record<ItemStatus, string> = {
+  remaining: "Remaining", working: "Working", not_working: "Not working",
+  not_tested: "Can't test", not_found: "Couldn't find", done: "Done",
+};
+
+async function resultsCsv(env: Env, code: string, viewer: Viewer, preview: boolean) {
+  const data = await loadResults(env, code);
+  const customerView = !viewer.internal || preview;
+  const byId = (list: Json[]) => new Map(list.map(x => [x.id, x]));
+  const sites = byId(data.sites), buildings = byId(data.buildings), floors = byId(data.floors);
+  const header = ["site", "building", "floor", "category", "on_list", "name", "extension", "phone_number", "listed_location",
+    "status", "discrepancy", "discrepancy_note", "location_detail", "updated_at", ...(customerView ? [] : ["surveyed_by", "notes"])];
+  const line = (r: Json, onList: boolean) => [
+    sites.get(r.site_id)?.name, buildings.get(r.building_id)?.name, floors.get(r.floor_id)?.name, r.category,
+    onList ? "yes" : "no", r.name, r.extension, r.phone_number, r.listed_location,
+    STATUS_LABELS[statusOf(r)], r.discrepancy, r.discrepancy_note, r.location_note, r.updated_at,
+    ...(customerView ? [] : [r.created_by, r.notes]),
+  ].map(csvCell).join(",");
+  const lines = [header.join(","), ...data.items.map(r => line(r, true)), ...data.extras.map(r => line(r, false))];
+  return new Response(lines.join("\r\n") + "\r\n", {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="${data.project.code}-results.csv"`,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+// ---- Customer access (admin) -----------------------------------------------
+
+async function listAccess(env: Env, code: string) {
+  const project = await projectByCode(env, code);
+  const { results } = await env.DB.prepare(
+    `SELECT id, principal, created_by, created_at FROM project_access WHERE project_id = ? ORDER BY principal`,
+  ).bind(project.id).all();
+  return results;
+}
+
+async function addAccess(env: Env, code: string, input: Json, who: string) {
+  const project = await projectByCode(env, code);
+  const principal = reqStr(input, "principal", 200).toLowerCase();
+  // "jane@customer.edu" or "@customer.edu"
+  if (!/^[^@\s]*@[a-z0-9.-]+\.[a-z]{2,}$/.test(principal)) {
+    throw new HttpError(400, "Enter an email address (jane@customer.edu) or a domain starting with @ (@customer.edu).");
+  }
+  const internal = (env.INTERNAL_DOMAINS || "packetfusion.com").split(",").map(s => s.trim().toLowerCase());
+  if (internal.includes(principal.slice(principal.indexOf("@") + 1))) {
+    throw new HttpError(400, "Packet Fusion accounts already see every project; add customer addresses here.");
+  }
+  await env.DB.prepare(
+    `INSERT INTO project_access (id, project_id, principal, created_by) VALUES (?, ?, ?, ?)
+     ON CONFLICT(project_id, principal) DO NOTHING`,
+  ).bind(crypto.randomUUID(), project.id, principal, who).run();
+  return listAccess(env, code);
+}
+
+async function removeAccess(env: Env, code: string, id: string) {
+  const project = await projectByCode(env, code);
+  await env.DB.prepare(`DELETE FROM project_access WHERE id = ? AND project_id = ?`).bind(id, project.id).run();
+  return listAccess(env, code);
 }
 
 // ---- Reads -----------------------------------------------------------------

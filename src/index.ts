@@ -5,6 +5,7 @@
  *   /api/*   → survey API backed by D1 (see ./api.ts)
  *   /pdfs/*  → streamed out of R2 (719 source drawings, ~380 MB)
  *   /        → redirect to /survey
+ *   /results/<project> → the results page (static, reads the project from the URL)
  *   anything → the static bundle in ./public (survey app, LACCD library at /laccd, thumbnails)
  *
  * The PDFs deliberately sit behind the Worker rather than on a public R2
@@ -13,7 +14,7 @@
  */
 
 import { verifyAccess } from "./access";
-import { handleApi } from "./api";
+import { handleApi, resolveViewer } from "./api";
 
 export interface Env {
   /** Static assets: frontend shell, catalog.json, and floor-plan thumbnails. */
@@ -30,6 +31,8 @@ export interface Env {
   ACCESS_AUD: string;
   /** Comma-separated emails allowed to change project setup (branding, briefings, imports). */
   ADMIN_EMAILS?: string;
+  /** Comma-separated email domains treated as Packet Fusion staff. Default "packetfusion.com". */
+  INTERNAL_DOMAINS?: string;
 }
 
 /** Requests under this prefix are served from R2 rather than from static assets. */
@@ -37,6 +40,9 @@ const PDF_PREFIX = "/pdfs/";
 
 /** Survey API; must also be listed in assets.run_worker_first in wrangler.jsonc. */
 const API_PREFIX = "/api/";
+
+/** A project's results page, e.g. /results/laccd-dts. */
+const RESULTS_PAGE = /^\/results\/[a-z0-9_-]+\/?$/i;
 
 /**
  * Drawings are revised by re-export, not in place, so a long shared-cache TTL
@@ -64,12 +70,17 @@ export default {
       return Response.redirect(new URL("/survey", url).toString(), 302);
     }
 
+    // /results/<project> is one static page that reads the code from the URL.
+    if (RESULTS_PAGE.test(url.pathname)) {
+      return env.ASSETS.fetch(new Request(new URL("/results/", url), request));
+    }
+
     if (url.pathname.startsWith(API_PREFIX)) {
       // Survey data is the most sensitive thing served here, so it gets the
       // same origin-side re-check as the drawings.
       const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
       if (!access.ok) return access.response;
-      return handleApi(request, env, access.identity?.email || null);
+      return handleApi(request, env, identityOf(request, env, access.identity?.email));
     }
 
     if (url.pathname.startsWith(PDF_PREFIX)) {
@@ -78,6 +89,9 @@ export default {
       // directly. Static assets are not re-checked here — see README.
       const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
       if (!access.ok) return access.response;
+      // Drawings are for Packet Fusion staff; customer accounts see results only.
+      const viewer = await resolveViewer(env, identityOf(request, env, access.identity?.email));
+      if (!viewer.internal) return new Response("Not available for this account.", { status: 403 });
 
       const gated = Boolean(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
       return servePdf(request, env, ctx, url, gated);
@@ -86,6 +100,17 @@ export default {
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * The signed-in email. Only when Access is switched off (local dev) may a
+ * request pose as someone via x-dev-user, so the customer view and its limits
+ * can be tested on localhost. With Access configured the header is ignored.
+ */
+function identityOf(request: Request, env: Env, accessEmail: string | undefined): string | null {
+  if (accessEmail) return accessEmail;
+  const accessOff = !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD;
+  return (accessOff && request.headers.get("x-dev-user")) || null;
+}
 
 async function servePdf(
   request: Request,
