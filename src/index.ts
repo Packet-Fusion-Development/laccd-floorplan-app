@@ -1,9 +1,12 @@
 /**
- * LACCD Floorplan Catalog — edge entrypoint.
+ * PF Site Survey — edge entrypoint.
  *
- * Two classes of request:
+ * Three classes of request:
+ *   /api/*   → survey API backed by D1 (see ./api.ts)
  *   /pdfs/*  → streamed out of R2 (719 source drawings, ~380 MB)
- *   anything → the static bundle in ./public (shell, catalog.json, thumbnails)
+ *   /        → redirect to /survey
+ *   /results/<project> → the results page (static, reads the project from the URL)
+ *   anything → the static bundle in ./public (survey app, LACCD library at /laccd, thumbnails)
  *
  * The PDFs deliberately sit behind the Worker rather than on a public R2
  * domain: it keeps a single hostname for Cloudflare Access to gate, and it
@@ -11,20 +14,38 @@
  */
 
 import { verifyAccess } from "./access";
+import { handleApi, resolveViewer } from "./api";
 
 export interface Env {
   /** Static assets: frontend shell, catalog.json, and floor-plan thumbnails. */
   ASSETS: Fetcher;
-  /** Source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf" (e.g. "ELAC/ELAC A5 Floor Plan.pdf"). */
+  /** LACCD source PDFs, keyed as "<CAMPUS_CODE>/<filename>.pdf". Other projects' plans are in MEDIA. */
   PDFS: R2Bucket;
+  /** Multi-project survey database — see migrations/0001_multi_project_schema.sql. */
+  DB: D1Database;
+  /** Survey photos, keyed "<project_code>/surveys/<survey_id>/photos/<photo_id>.<ext>". */
+  MEDIA: R2Bucket;
   /** Access team domain, e.g. "packetfusion.cloudflareaccess.com". Empty = no enforcement. */
   ACCESS_TEAM_DOMAIN: string;
   /** Access application AUD tag. Empty = no enforcement. */
   ACCESS_AUD: string;
+  /** Comma-separated emails allowed to change project setup (branding, briefings, imports). */
+  ADMIN_EMAILS?: string;
+  /** Comma-separated email domains treated as Packet Fusion staff. Default "packetfusion.com". */
+  INTERNAL_DOMAINS?: string;
 }
 
 /** Requests under this prefix are served from R2 rather than from static assets. */
 const PDF_PREFIX = "/pdfs/";
+
+/** Survey API; must also be listed in assets.run_worker_first in wrangler.jsonc. */
+const API_PREFIX = "/api/";
+
+/** pdf.js for the results page, served from public/vendor/pdfjs-3.11.174. */
+const RESULTS_PDFJS = "/results/pdfjs/";
+
+/** A project's results page, e.g. /results/laccd-dts. */
+const RESULTS_PAGE = /^\/results\/[a-z0-9_-]+\/?$/i;
 
 /**
  * Drawings are revised by re-export, not in place, so a long shared-cache TTL
@@ -46,12 +67,42 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // The site root is the survey app. (There is no public/index.html, so
+    // static assets fall through to the Worker for "/".)
+    if (url.pathname === "/") {
+      return Response.redirect(new URL("/survey", url).toString(), 302);
+    }
+
+    // The results page renders plans with the vendored pdf.js. It is exposed
+    // under /results/ so a customer's Access scope (/results) covers it too.
+    if (url.pathname.startsWith(RESULTS_PDFJS)) {
+      const file = url.pathname.slice(RESULTS_PDFJS.length);
+      if (!/^pdf(\.worker)?\.min\.js$/.test(file)) return new Response("Not Found", { status: 404 });
+      return env.ASSETS.fetch(new Request(new URL(`/vendor/pdfjs-3.11.174/${file}`, url), request));
+    }
+
+    // /results/<project> is one static page that reads the code from the URL.
+    if (RESULTS_PAGE.test(url.pathname)) {
+      return env.ASSETS.fetch(new Request(new URL("/results/", url), request));
+    }
+
+    if (url.pathname.startsWith(API_PREFIX)) {
+      // Survey data is the most sensitive thing served here, so it gets the
+      // same origin-side re-check as the drawings.
+      const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
+      if (!access.ok) return access.response;
+      return handleApi(request, env, identityOf(request, env, access.identity?.email));
+    }
+
     if (url.pathname.startsWith(PDF_PREFIX)) {
       // Access gates the hostname at the edge; this re-checks the assertion so
       // the drawings stay protected even if something reaches the Worker
       // directly. Static assets are not re-checked here — see README.
       const access = await verifyAccess(request, env.ACCESS_TEAM_DOMAIN, env.ACCESS_AUD);
       if (!access.ok) return access.response;
+      // Drawings are for Packet Fusion staff; customer accounts see results only.
+      const viewer = await resolveViewer(env, identityOf(request, env, access.identity?.email));
+      if (!viewer.internal) return new Response("Not available for this account.", { status: 403 });
 
       const gated = Boolean(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
       return servePdf(request, env, ctx, url, gated);
@@ -60,6 +111,17 @@ export default {
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * The signed-in email. Only when Access is switched off (local dev) may a
+ * request pose as someone via x-dev-user, so the customer view and its limits
+ * can be tested on localhost. With Access configured the header is ignored.
+ */
+function identityOf(request: Request, env: Env, accessEmail: string | undefined): string | null {
+  if (accessEmail) return accessEmail;
+  const accessOff = !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD;
+  return (accessOff && request.headers.get("x-dev-user")) || null;
+}
 
 async function servePdf(
   request: Request,
@@ -98,7 +160,11 @@ async function servePdf(
     if (cached) return cached;
   }
 
-  const object = await env.PDFS.get(key, {
+  // LACCD's drawings live in their own bucket (keys like "ELAC/…"). Drawings
+  // for every other project live with that project's media, under
+  // "<project_code>/plans/…", so a new customer never writes into LACCD's bucket.
+  const bucket = key.includes("/plans/") ? env.MEDIA : env.PDFS;
+  const object = await bucket.get(key, {
     range: request.headers,
     onlyIf: request.headers,
   });

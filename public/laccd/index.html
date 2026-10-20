@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LACCD Floorplan Catalog</title>
-<link rel="stylesheet" href="style.css">
+<title>LACCD Floor Plans — Packet Fusion Site Survey</title>
+<!-- Absolute paths: this page lives at /laccd/ but shares the site-wide assets. -->
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
 <header class="app-header">
   <div class="app-header-top">
     <div class="brand-mark">
-      <img src="https://packetfusion.com/wp-content/uploads/2024/09/PacketFusion-Bridgepoint-Logo.png" alt="PacketFusion - Powered by Bridgepointe Technologies" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-      <div class="brand-fallback" style="display:none;">Packet<span>Fusion</span></div>
+      <img src="/brand/packet-fusion-logo-white.png" alt="Packet Fusion — Powered by Bridgepointe Technologies" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="brand-fallback" style="display:none;">Packet <span>Fusion</span></div>
     </div>
     <div class="app-header-right">
-      <div class="powered-by">LACCD District Technology Survey</div>
+      <a class="powered-by" href="/survey">Open field survey →</a>
 
       <!-- Populated from /cdn-cgi/access/get-identity; stays hidden when the
            app is not running behind Access (e.g. local dev). -->
@@ -36,6 +37,7 @@
     </div>
   </div>
 
+  <!-- Floor-plan library for the LACCD project (data/laccd/catalog.json). -->
   <h1>LACCD Floorplan Catalog</h1>
   <p class="subtitle" id="subtitle">Loading...</p>
 </header>
@@ -68,6 +70,6 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

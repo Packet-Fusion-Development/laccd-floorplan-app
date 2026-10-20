@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "laccd-floorplan-app",
+  // Production Worker for Packet Fusion Site Survey. The live LACCD floor-plan
+  // site still runs as the separate Worker "laccd-floorplan-app" (deployed
+  // from main) until the production cutover in the README.
+  "name": "pf-site-survey",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
 
@@ -13,41 +16,112 @@
   },
 
   // Cloudflare Access can only protect a hostname on a zone in this account —
-  // it cannot protect *.workers.dev. So the app moves to a custom domain and
+  // it cannot protect *.workers.dev — so the app runs on a custom domain and
   // workers.dev is switched off, rather than left open beside the gated door.
   //
-  // Deploying this creates the DNS record. Create the Access application
-  // FIRST (see README) so the hostname is never briefly public.
+  // Deploying this creates the DNS record. Add survey.packetfusion.com to an
+  // Access application FIRST (see README) so it is never briefly public.
   "workers_dev": false,
   "routes": [
     {
-      "pattern": "laccd-floorplan-app.packetfusion.com",
+      "pattern": "survey.packetfusion.com",
       "custom_domain": true
     }
   ],
 
   "vars": {
     // Both must be set for the Worker to enforce Access. Empty = open.
-    // ACCESS_AUD is the application's AUD tag, not a secret.
+    // ACCESS_AUD is the application's AUD tag, not a secret. This is the
+    // shared Packet Fusion Access app's tag; change it if production gets its own.
     "ACCESS_TEAM_DOMAIN": "packetfusion.cloudflareaccess.com",
-    "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad"
+    "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad",
+    // Who may change project setup: branding, site briefings, inventory
+    // imports. Comma-separated. Everyone signed in can survey.
+    "ADMIN_EMAILS": "ksabonis@packetfusion.com"
   },
 
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    // Only PDF requests need the Worker. The shell, catalog.json, and all 719
-    // thumbnails are served straight from the edge with no Worker invocation.
-    "run_worker_first": ["/pdfs/*"]
+    // Only PDF and API requests need the Worker. The shell, catalog.json, and
+    // all 719 thumbnails are served straight from the edge with no Worker
+    // invocation.
+    "run_worker_first": ["/pdfs/*", "/api/*"]
   },
 
   "r2_buckets": [
     {
+      // The LACCD project's drawings (keys like "ELAC/…"). Every other
+      // project's plans live in MEDIA under "<project>/plans/…".
       "binding": "PDFS",
       "bucket_name": "laccd-floorplans",
       // Used by `wrangler dev --remote` (npm run dev:remote). Plain
       // `wrangler dev` uses a local stub and will 404 on /pdfs/*.
       "preview_bucket_name": "laccd-floorplans"
+    },
+    {
+      // Field survey photos for every project. Create once with
+      // `npx wrangler r2 bucket create pf-site-survey-media`.
+      "binding": "MEDIA",
+      "bucket_name": "pf-site-survey-media"
     }
-  ]
+  ],
+
+  // Multi-project survey data: customers, projects, sites, floor plans,
+  // rooms, surveys, devices, photos. Schema in ./migrations.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pf-site-survey",
+      "database_id": "515130f4-588f-43e9-9d57-2f8687524426",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "env": {
+    // Test copy for trying the field app on real phones and tablets:
+    //   npx wrangler deploy --env test
+    // Its own Worker, database and photo bucket, so nothing here touches the
+    // live floor-plan app. It reads the same drawings bucket (read-only use).
+    //
+    // survey-test.packetfusion.com must be covered by a Cloudflare Access
+    // application BEFORE the first deploy — the static shell and catalog are
+    // served without the Worker, so Access at the edge is their only gate.
+    "test": {
+      "name": "pf-site-survey-test",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "survey-test.packetfusion.com",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ACCESS_TEAM_DOMAIN": "packetfusion.cloudflareaccess.com",
+        // survey-test is a public hostname on the shared Packet Fusion Access
+        // app (the one that also covers the LACCD site), so it uses that
+        // app's tag. A separate Access app would have its own.
+        "ACCESS_AUD": "11769c92d77e09df46d379817bbde18cc86d8eafd65f18ad9e4024a1d09eb4ad",
+        "ADMIN_EMAILS": "ksabonis@packetfusion.com"
+      },
+      "r2_buckets": [
+        {
+          "binding": "PDFS",
+          "bucket_name": "laccd-floorplans"
+        },
+        {
+          "binding": "MEDIA",
+          "bucket_name": "pf-site-survey-media-test"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pf-site-survey-test",
+          "database_id": "cf2b90d5-1c85-4117-b680-abc1e1b9d467",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }

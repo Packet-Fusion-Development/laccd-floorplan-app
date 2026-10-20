@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Packet Fusion Site Survey</title>
+<meta name="theme-color" content="#003B5C">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Site Survey">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/survey.css">
+</head>
+<body class="survey-app">
+
+<!-- Packet Fusion brand bar on every screen: the app is always
+     "Packet Fusion Site Survey", whatever the project. -->
+<header class="sv-brandbar">
+  <a class="sv-brandbar-logo" href="#/" title="Home">
+    <img src="/brand/packet-fusion-logo-white.png" alt="Packet Fusion — Powered by Bridgepointe Technologies">
+  </a>
+  <span class="sv-brandbar-title">Site Survey</span>
+  <span class="sv-status" data-status role="status"></span>
+</header>
+
+<!-- Shown only while offline, signed out, or holding rejected changes. -->
+<div class="sv-banner" id="statusBanner" hidden></div>
+
+<main class="sv-main" id="view">
+  <p class="sv-loading">Loading…</p>
+</main>
+
+<!-- Bottom sheet: Get Support actions, rejected-change review. -->
+<div class="sv-sheet-overlay" id="sheetOverlay" hidden>
+  <div class="sv-sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <button class="close-btn" type="button" id="sheetClose" aria-label="Close">&times;</button>
+    <div id="sheetContent"></div>
+  </div>
+</div>
+
+<script type="module" src="/survey.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  }
+</script>
+</body>
+</html>

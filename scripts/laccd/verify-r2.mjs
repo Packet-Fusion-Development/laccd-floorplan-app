@@ -9,14 +9,14 @@
  * way in (see the `wrangler r2 object put` note in the README) produces a
  * card that 404s on click, and nothing else surfaces that.
  *
- *   npm run verify:r2
+ *   npm run laccd:verify-r2
  */
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const {
   CLOUDFLARE_ACCOUNT_ID,
@@ -61,7 +61,7 @@ async function listAll() {
   return objects;
 }
 
-const rows = JSON.parse(await readFile(join(root, "data", "catalog.json"), "utf8"));
+const rows = JSON.parse(await readFile(join(root, "data", "laccd", "catalog.json"), "utf8"));
 const bucket = await listAll();
 
 console.log(`catalog: ${rows.length} rows    bucket: ${bucket.size} objects\n`);

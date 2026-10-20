@@ -9,5 +9,5 @@
 
 # Generated / bulk files: keep them out of diffs and language stats.
 package-lock.json   linguist-generated=true -diff
-data/catalog.json   linguist-generated=true
+data/laccd/catalog.json   linguist-generated=true
 public/thumbs/**    linguist-vendored=true

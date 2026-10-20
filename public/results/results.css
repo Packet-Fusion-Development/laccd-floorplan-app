@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Results page in the LACCD catalog's look: navy header, green rule, white
+   cards on a cool grey page. A deliberate single (light) theme, like the
+   catalog. Status colours follow the validated status palette and always
+   travel with a text label. */
+:root {
+  color-scheme: light;
+  --navy: #003B5C;
+  --navy-dark: #002A42;
+  --navy-tint: #eaf1f5;
+  --green: #17C662;
+  --green-dark: #12a352;
+  --blue: #63C1EA;
+  --grey: #D9E1E2;
+  --bg: #f4f7f8;
+  --panel: #ffffff;
+  --border: #e2e8ea;
+  --text: #1c2b33;
+  --muted: #5b6f7c;
+
+  /* Status (good / warning / critical / serious) + neutral remaining */
+  --st-working: #0CA30C;
+  --st-not-tested: #FAB219;
+  --st-not-working: #D03B3B;
+  --st-not-found: #EC835A;
+  --st-done: #63C1EA;
+  --st-remaining: #D9E1E2;
+
+  --font-head: "Poppins", "Futura", "Avenir Next", Arial, sans-serif;
+  --font-body: "Inter", "Avenir", "Avenir Next", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--font-head); color: var(--navy); margin: 0; text-wrap: balance; }
+a { color: var(--navy); }
+button { font: inherit; }
+:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+
+/* ---- Header ------------------------------------------------------------ */
+
+.rs-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+  border-bottom: 3px solid var(--green);
+  color: #fff;
+  padding: 20px max(16px, 4vw) 24px;
+}
+.rs-header h1 { color: #fff; font-size: clamp(22px, 3.2vw, 30px); margin-top: 2px; }
+.rs-header-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.rs-logo { height: 58px; width: auto; display: block; }
+.rs-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rs-eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); }
+.rs-subtitle { margin: 4px 0 0; color: rgba(255,255,255,.78); font-size: 14px; }
+
+.rs-badge { font-size: 12px; font-weight: 700; letter-spacing: .03em; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; }
+.rs-badge.is-customer { background: var(--green); color: var(--navy-dark); }
+.rs-hbtn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 7px 14px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,.35); background: transparent;
+  color: #fff; font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.rs-hbtn:hover { background: rgba(255,255,255,.12); }
+.rs-hbtn.is-primary { background: var(--green); border-color: var(--green); color: var(--navy-dark); }
+.rs-hbtn.is-primary:hover { background: var(--green-dark); color: #fff; }
+
+/* ---- Layout ------------------------------------------------------------ */
+
+.rs-main { max-width: 1240px; margin: 0 auto; padding: 24px max(16px, 3vw) 64px; display: grid; gap: 22px; }
+/* Grid children default to min-width: auto, which lets a wide table widen
+   the whole page on phones; they must shrink and scroll their own content. */
+.rs-main > *, .rs-main section > *, .rs-totals > *, .rs-sites > *, .rs-panel > * { min-width: 0; }
+.rs-card, .rs-table-wrap { max-width: 100%; }
+.rs-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rs-section-head h2 { font-size: 19px; }
+.rs-note { margin: 0; font-size: 13px; color: var(--muted); }
+.rs-empty { text-align: center; color: var(--muted); padding: 48px 0; }
+.rs-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(0,59,92,.06); }
+
+/* ---- Totals ------------------------------------------------------------ */
+
+.rs-totals { display: grid; grid-template-columns: minmax(min(260px, 100%), 1.4fr) repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.rs-hero { padding: 18px 20px; display: grid; gap: 8px; }
+.rs-hero .label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rs-hero .value { font-family: var(--font-head); font-size: 40px; line-height: 1; color: var(--navy); font-variant-numeric: tabular-nums; }
+.rs-hero .sub { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rs-tile { padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.rs-tile .label { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rs-tile .value { font-family: var(--font-head); font-size: 26px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.rs-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* ---- Filters ----------------------------------------------------------- */
+
+.rs-filters { padding: 16px 18px; display: grid; gap: 12px; }
+.rs-filters input, .rs-filters select {
+  min-height: 42px; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 9px;
+  background: #fff; font: inherit; font-size: 15px; color: var(--text);
+}
+.rs-filters input { width: 100%; }
+.rs-filters input:focus, .rs-filters select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px #e7faef; }
+.rs-filter-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.rs-filter-row select { flex: 1 1 200px; min-width: 0; }
+.rs-clear { min-height: 42px; padding: 8px 14px; border: 0; border-radius: 9px; background: var(--navy-tint); color: var(--navy); font-weight: 600; cursor: pointer; }
+
+.rs-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.rs-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- Status bar (stacked, 2px gaps, rounded ends) ---------------------- */
+
+.rs-bar { display: flex; gap: 2px; height: 12px; border-radius: 4px; overflow: hidden; background: var(--bg); }
+.rs-bar > i { display: block; height: 100%; min-width: 3px; }
+.rs-bar > i:first-child { border-radius: 4px 0 0 4px; }
+.rs-bar > i:last-child { border-radius: 0 4px 4px 0; }
+.rs-bar.is-small { height: 8px; }
+
+/* ---- Site cards -------------------------------------------------------- */
+
+.rs-sites { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.rs-site { padding: 16px 18px; display: grid; gap: 10px; align-content: start; transition: box-shadow .18s, border-color .18s; }
+.rs-site:hover { border-color: var(--green); box-shadow: 0 10px 24px rgba(0,59,92,.10); }
+.rs-site .code { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--green-dark); }
+.rs-site h3 { font-size: 17px; }
+.rs-site .pct { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rs-site .pct b { color: var(--navy); font-size: 15px; }
+.rs-cats { display: grid; gap: 4px; font-size: 13px; }
+.rs-cats div { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.rs-cats span:last-child { color: var(--muted); }
+.rs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--navy-tint); color: var(--navy); }
+.rs-chip.is-critical { background: #fdecea; color: #8a1c12; }
+.rs-chip.is-serious { background: #fff1ea; color: #8a3a12; }
+.rs-chip.is-flag { background: #fff4e5; color: #7a4a00; }
+.rs-site-btn { justify-self: start; min-height: 38px; padding: 7px 14px; border-radius: 8px; border: 0; background: var(--green); color: var(--navy-dark); font-weight: 700; cursor: pointer; }
+.rs-site-btn:hover { background: var(--green-dark); color: #fff; }
+
+/* ---- Tables ------------------------------------------------------------ */
+
+.rs-table-wrap { overflow-x: auto; }
+.rs-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.rs-table th { text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: #fafcfc; }
+.rs-table td { padding: 10px 12px; border-bottom: 1px solid #eef1f2; vertical-align: top; }
+.rs-table td.num, .rs-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-table tr.is-floor td { background: #fafcfc; font-size: 13px; }
+.rs-table tr.is-floor td:first-child { padding-left: 30px; }
+.rs-table .muted { color: var(--muted); }
+.rs-row-toggle { border: 0; background: none; padding: 0; color: var(--navy); font-weight: 600; cursor: pointer; text-align: left; }
+.rs-row-toggle::before { content: "▸ "; color: var(--muted); }
+.rs-row-toggle[aria-expanded="true"]::before { content: "▾ "; }
+.rs-bar-cell { min-width: 140px; }
+
+.rs-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 12px 0; }
+.rs-tab { min-height: 36px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: var(--navy); font-weight: 600; font-size: 13px; cursor: pointer; }
+.rs-tab[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.rs-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+
+/* ---- Site breakdown: building cards ------------------------------------ */
+
+.rs-bcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 14px; }
+.rs-bcard { padding: 16px 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.rs-bhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rs-bhead h3 { font-size: 16px; }
+.rs-bpct { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-bpct b { color: var(--navy); font-size: 15px; }
+.rs-floors { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.rs-floor { display: grid; grid-template-columns: minmax(84px, 7.5em) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.rs-floor-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-floor-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-numbers > summary { padding: 12px 16px; font-weight: 600; color: var(--navy); cursor: pointer; }
+.rs-floor { grid-template-columns: minmax(84px, 7.5em) minmax(0, 1fr) auto auto; }
+.rs-plan-btn {
+  min-height: 32px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--green-dark);
+  background: #fff; color: var(--green-dark); font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.rs-plan-btn:hover { background: var(--green); border-color: var(--green); color: var(--navy-dark); }
+
+/* ---- Floor plan view --------------------------------------------------- */
+
+.rs-back { justify-self: start; border: 0; background: none; padding: 4px 0; color: var(--navy); font-weight: 700; cursor: pointer; }
+.rs-plan-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rs-zoom { display: inline-flex; gap: 6px; }
+.rs-zoom .rs-clear { min-width: 42px; font-size: 18px; }
+.rs-plan-wrap {
+  position: relative; overflow: auto; -webkit-overflow-scrolling: touch;
+  max-height: 68vh; background: var(--grey); border: 1px solid var(--border); border-radius: 12px;
+}
+.rs-plan-stage { position: relative; width: 100%; }
+.rs-plan-stage canvas { display: block; width: 100%; height: auto; background: #fff; }
+.rs-plan-stage.is-blank { aspect-ratio: 17 / 11; background: #fff; }
+.rs-pin {
+  position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; padding: 0;
+  border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 14px/24px var(--font-body);
+  text-align: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.rs-pin.is-dark-ink { color: var(--navy-dark); }
+.rs-pin.is-selected { outline: 3px solid var(--navy); outline-offset: 2px; z-index: 2; }
+.rs-pin.is-flagged::after {
+  content: "!"; position: absolute; top: -8px; right: -8px; width: 16px; height: 16px; border-radius: 50%;
+  background: #7a4a00; color: #fff; font-size: 11px; line-height: 16px; border: 1px solid #fff;
+}
+.rs-pin-key {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  color: #fff; font-size: 10px; font-style: normal; font-weight: 700;
+}
+.rs-pin-key.is-flag-key { background: #7a4a00; }
+.rs-pin-info { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+.rs-pin-info h3 { font-size: 16px; margin-bottom: 8px; }
+.rs-dl { margin: 0; display: grid; gap: 6px; }
+.rs-dl div { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 10px; }
+.rs-dl dt { color: var(--muted); font-size: 13px; }
+.rs-dl dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.rs-table tr[data-row] { cursor: pointer; }
+.rs-table tr.is-selected td { background: #eef6f1; }
+
+/* ---- Detail panel ------------------------------------------------------ */
+
+.rs-overlay { position: fixed; inset: 0; background: rgba(0,20,33,.5); display: flex; justify-content: flex-end; z-index: 100; }
+.rs-overlay[hidden] { display: none; }
+.rs-panel { background: #fff; width: min(1120px, 100%); height: 100%; overflow-y: auto; padding: 28px max(16px, 3vw) 48px; position: relative; display: grid; gap: 18px; align-content: start; }
+.rs-close { position: absolute; top: 14px; right: 16px; border: 0; background: none; font-size: 28px; line-height: 1; color: var(--muted); cursor: pointer; }
+.rs-panel h2 { font-size: 22px; padding-right: 40px; }
+
+.rs-tooltip {
+  position: fixed; z-index: 200; pointer-events: none; background: var(--navy-dark); color: #fff;
+  font-size: 12.5px; font-weight: 600; padding: 6px 9px; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.rs-tooltip[hidden] { display: none; }
+
+@media (max-width: 720px) {
+  .rs-totals { grid-template-columns: 1fr 1fr; }
+  .rs-hero { grid-column: 1 / -1; }
+  .rs-logo { height: 46px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
