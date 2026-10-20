@@ -14,7 +14,8 @@ university campus, a city's facilities, or a company's offices.
 | | Address | Worker |
 |---|---|---|
 | Test copy | https://survey-test.packetfusion.com/survey | `pf-site-survey-test` |
-| Production (not yet deployed) | https://survey.packetfusion.com | `pf-site-survey` |
+| Production | https://survey.packetfusion.com | `pf-site-survey` |
+| LACCD floor-plan site (legacy) | https://laccd-floorplan-app.packetfusion.com | `laccd-floorplan-app` |
 
 ## Projects
 
@@ -211,7 +212,7 @@ buckets.
 https://survey-test.packetfusion.com/survey. It has its own D1 database
 (`pf-site-survey-test`) and photo bucket (`pf-site-survey-media-test`), and
 reads LACCD's drawings from `laccd-floorplans`. The hostname is a public
-hostname on the shared Packet Fusion Access application, whose
+hostname on the shared Access application "Packet Fusion App", whose
 "Packet Fusion Entra SSO" policy admits any `@packetfusion.com` account.
 
 ## Demo project: Packet Fusion University
@@ -246,7 +247,7 @@ drawings across the ten Los Angeles Community College District campuses.
 | Thumbnails | `public/thumbs/<CAMPUS>/*.jpg` |
 | Drawings (~380 MB) | R2 bucket `laccd-floorplans`, keys `<CAMPUS>/<file>.pdf`, served at `/pdfs/…` |
 | Survey project | `laccd-dts`, loaded from the catalog by `npm run laccd:seed:*` |
-| Live floor-plan site | https://laccd-floorplan-app.packetfusion.com: the earlier `laccd-floorplan-app` Worker, deployed from `main` until the production cutover |
+| Legacy floor-plan site | https://laccd-floorplan-app.packetfusion.com: the earlier `laccd-floorplan-app` Worker. Still live, but no longer deployed from this repo (see [Production cutover](#production-cutover)) |
 
 `npm run build` validates the catalog and writes `public/catalog.json`. It is
 a tripwire: it fails on rows with missing fields, duplicate paths, or
@@ -304,20 +305,21 @@ When Access is enforcing, PDFs are returned `Cache-Control: private`.
 
 ## Production cutover
 
-`main` still deploys the original `laccd-floorplan-app` Worker. Do these in
-order before this work merges to `main`:
+Done 2026-10-20. `main` now deploys `pf-site-survey`.
 
-1. **GitHub** (repo admin): Settings → General → rename the repo to
-   `pf-site-survey`. GitHub redirects the old URL. Reconnect Workers Builds if
-   it is linked, and run `git remote set-url origin https://github.com/Packet-Fusion-Development/pf-site-survey.git`
-   in local clones.
-2. **D1 and R2**: `npx wrangler d1 create pf-site-survey`, put the id in
-   `wrangler.jsonc` in place of the placeholder, then `npm run db:migrate:remote`
-   and `npm run laccd:seed:remote`. Create the photo bucket with
-   `npx wrangler r2 bucket create pf-site-survey-media`.
-3. **Access**: add `survey.packetfusion.com` as a public hostname on the
-   Packet Fusion Access application (or a new one, then update `ACCESS_AUD`)
-   **before** deploying.
-4. **Deploy** `pf-site-survey` with `npm run deploy` and confirm it serves.
-5. **LACCD site**: decide whether `laccd-floorplan-app.packetfusion.com` keeps
-   running as its own Worker or redirects to `survey.packetfusion.com/laccd/`.
+1. **GitHub**: the repo was renamed from `laccd-floorplan-app` to
+   `pf-site-survey`; GitHub redirects the old URL. In an older clone, run
+   `git remote set-url origin https://github.com/Packet-Fusion-Development/pf-site-survey.git`.
+2. **D1 and R2**: created D1 `pf-site-survey`, applied the migrations, and
+   seeded LACCD (`npm run laccd:seed:remote`). Created the photo bucket
+   `pf-site-survey-media`.
+3. **Access**: added `survey.packetfusion.com` as a public hostname on the
+   shared Access application, since renamed "Packet Fusion App". It covers all
+   three hostnames under one AUD tag.
+4. **Deploy**: `pf-site-survey` deployed; unauthenticated requests to `/`,
+   `/api/*` and `/pdfs/*` redirect to the Entra sign-in.
+
+**Still open: the LACCD site.** `laccd-floorplan-app.packetfusion.com` still
+runs the original `laccd-floorplan-app` Worker, but nothing in this repo
+deploys it any more. Decide whether it stays as its own Worker or redirects to
+`survey.packetfusion.com/laccd/` and is retired.
