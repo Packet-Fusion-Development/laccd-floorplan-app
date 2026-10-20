@@ -69,7 +69,8 @@ button { font: inherit; }
 .rs-main { max-width: 1240px; margin: 0 auto; padding: 24px max(16px, 3vw) 64px; display: grid; gap: 22px; }
 /* Grid children default to min-width: auto, which lets a wide table widen
    the whole page on phones; they must shrink and scroll their own content. */
-.rs-main > *, .rs-totals > *, .rs-sites > *, .rs-panel > * { min-width: 0; }
+.rs-main > *, .rs-main section > *, .rs-totals > *, .rs-sites > *, .rs-panel > * { min-width: 0; }
+.rs-card, .rs-table-wrap { max-width: 100%; }
 .rs-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .rs-section-head h2 { font-size: 19px; }
 .rs-note { margin: 0; font-size: 13px; color: var(--muted); }
@@ -151,6 +152,20 @@ button { font: inherit; }
 .rs-tab { min-height: 36px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: var(--navy); font-weight: 600; font-size: 13px; cursor: pointer; }
 .rs-tab[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
 .rs-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+
+/* ---- Site breakdown: building cards ------------------------------------ */
+
+.rs-bcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 14px; }
+.rs-bcard { padding: 16px 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.rs-bhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rs-bhead h3 { font-size: 16px; }
+.rs-bpct { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-bpct b { color: var(--navy); font-size: 15px; }
+.rs-floors { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.rs-floor { display: grid; grid-template-columns: minmax(84px, 7.5em) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.rs-floor-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-floor-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-numbers > summary { padding: 12px 16px; font-weight: 600; color: var(--navy); cursor: pointer; }
 
 /* ---- Detail panel ------------------------------------------------------ */
 

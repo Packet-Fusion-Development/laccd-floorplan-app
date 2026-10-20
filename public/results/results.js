@@ -272,17 +272,45 @@
     }).join('');
     const unplaced = bCounts.get(-1);
 
+    // Visual first: a card per building with its status bar and a bar per
+    // floor. The full numbers table follows for anyone who wants every column.
+    const chips = c => `
+      ${c.not_working ? `<span class="rs-chip is-critical">✕ ${fmt(c.not_working)} not working</span>` : ''}
+      ${c.not_found ? `<span class="rs-chip is-serious">? ${fmt(c.not_found)} couldn't find</span>` : ''}
+      ${c.flagged ? `<span class="rs-chip is-flag">⚑ ${fmt(c.flagged)} discrepanc${c.flagged === 1 ? 'y' : 'ies'}</span>` : ''}
+      ${c.offList ? `<span class="rs-chip">+ ${fmt(c.offList)} not on list</span>` : ''}`;
+    const bcard = (name, c, floors) => `
+      <article class="rs-card rs-bcard">
+        <div class="rs-bhead"><h3>${esc(name)}</h3>
+          <span class="rs-bpct"><b>${pct(c.done, c.items)}%</b> · ${fmt(c.done)} of ${fmt(c.items)}</span></div>
+        ${bar(c, c.items + c.offList)}
+        ${c.not_working || c.not_found || c.flagged || c.offList ? `<div class="rs-chips">${chips(c)}</div>` : ''}
+        ${floors.length ? `<div class="rs-floors">${floors.map(({ f, c: fc }) => `
+          <div class="rs-floor">
+            <span class="rs-floor-name">${esc(f.name)}</span>
+            ${bar(fc, fc.items + fc.offList, true)}
+            <span class="rs-floor-n">${fmt(fc.done)} / ${fmt(fc.items)}</span>
+          </div>`).join('')}</div>` : ''}
+      </article>`;
+    const cards = buildings.map(({ b, bi }) => bcard(b.name, bCounts.get(bi),
+      data.floors.map((f, fi) => ({ f, fi })).filter(({ f, fi }) => f.building === bi && fCounts.has(fi)).map(({ f, fi }) => ({ f, c: fCounts.get(fi) }))))
+      .join('') + (unplaced ? bcard('No building recorded', unplaced, []) : '');
+
     $('detailContent').innerHTML = `
       <div><p class="rs-note">${esc(s.code)}</p><h2 id="detailTitle">${esc(s.name)}</h2></div>
       <div class="rs-legend">${STATUS.map(x => `<span><i class="rs-swatch" style="background:${x.color}"></i>${esc(x.label)}</span>`).join('')}</div>
-      <div class="rs-card rs-table-wrap">
-        <table class="rs-table">
-          <thead><tr><th>Building / floor</th><th>Status</th><th class="num">Surveyed</th><th class="num">Done</th>
-            <th class="num">Working</th><th class="num">Not working</th><th class="num">Can't test</th>
-            <th class="num">Couldn't find</th><th class="num">Discrepancies</th><th class="num">Not on list</th></tr></thead>
-          <tbody>${rows}${unplaced ? line('No building recorded', unplaced) : ''}</tbody>
-        </table>
-      </div>`;
+      <div class="rs-bcards">${cards || '<p class="rs-empty">No buildings on file for this site.</p>'}</div>
+      <details class="rs-card rs-numbers">
+        <summary>Numbers table</summary>
+        <div class="rs-table-wrap">
+          <table class="rs-table">
+            <thead><tr><th>Building / floor</th><th>Status</th><th class="num">Surveyed</th><th class="num">Done</th>
+              <th class="num">Working</th><th class="num">Not working</th><th class="num">Can't test</th>
+              <th class="num">Couldn't find</th><th class="num">Discrepancies</th><th class="num">Not on list</th></tr></thead>
+            <tbody>${rows}${unplaced ? line('No building recorded', unplaced) : ''}</tbody>
+          </table>
+        </div>
+      </details>`;
     $('detailContent').querySelectorAll('tr.is-floor').forEach(tr => { tr.hidden = true; });
     $('detailContent').querySelectorAll('.rs-row-toggle').forEach(btn => btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
